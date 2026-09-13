@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ExpenseFlow — Personal Finance</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#718096;--line:#e7ebf2;--accent:#5b5ce2;--accent2:#8587f2;--good:#16a34a;--danger:#dc2626}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--text)}
+.app{display:flex;min-height:100vh}.side{width:240px;background:#171827;color:#fff;padding:26px 18px;position:fixed;inset:0 auto 0 0}.brand{font-size:22px;font-weight:800;padding:0 12px 28px}.brand span{color:#8f91ff}.nav button{width:100%;background:none;border:0;color:#aeb2c7;text-align:left;padding:12px;border-radius:10px;margin:3px 0;font-size:14px;cursor:pointer}.nav button.active,.nav button:hover{background:#292a42;color:#fff}.main{margin-left:240px;width:calc(100% - 240px);padding:30px 36px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}.title h1{margin:0;font-size:27px}.title p{margin:5px 0;color:var(--muted);font-size:14px}.actions{display:flex;gap:10px}.btn{border:0;border-radius:10px;padding:11px 15px;font-weight:700;cursor:pointer}.primary{background:var(--accent);color:#fff}.secondary{background:#fff;border:1px solid var(--line);color:var(--text)}select,input,textarea{font:inherit;border:1px solid var(--line);border-radius:9px;padding:10px;background:#fff;color:var(--text)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:0 3px 12px rgba(30,40,70,.035)}.kpi .label{font-size:13px;color:var(--muted)}.kpi .value{font-size:25px;font-weight:800;margin-top:8px}.kpi small{display:block;margin-top:7px;color:var(--muted)}
+.two{display:grid;grid-template-columns:1.25fr .75fr;gap:16px;margin-top:16px}.section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.section-title h2{font-size:17px;margin:0}.bars{display:flex;align-items:flex-end;height:220px;gap:8px;border-bottom:1px solid var(--line);padding:10px 4px 0}.barwrap{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;min-width:25px}.bar{width:70%;max-width:38px;background:linear-gradient(180deg,var(--accent2),var(--accent));border-radius:6px 6px 0 0;min-height:2px}.barlabel{font-size:10px;color:var(--muted);margin-top:7px;white-space:nowrap}.barvalue{font-size:9px;color:var(--muted);margin-bottom:4px}
+.cat{display:flex;flex-direction:column;gap:13px}.catrow{display:grid;grid-template-columns:110px 1fr 90px;align-items:center;gap:8px;font-size:13px}.track{height:8px;background:#edf0f6;border-radius:10px;overflow:hidden}.fill{height:100%;background:var(--accent);border-radius:10px}.catamt{text-align:right;font-weight:700}
+.tablecard{margin-top:16px}.filters{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px}.filters input{min-width:230px}.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:13px 10px;border-bottom:1px solid var(--line);text-align:left}th{color:var(--muted);font-weight:700;font-size:12px}td.amount{text-align:right;font-weight:700}.tag{padding:5px 8px;background:#f0f1ff;color:#4b4dc5;border-radius:20px;font-size:11px}.empty{text-align:center;color:var(--muted);padding:35px}
+.modal{position:fixed;inset:0;background:rgba(10,12,25,.45);display:none;align-items:center;justify-content:center;padding:20px}.modal.open{display:flex}.modalbox{background:#fff;border-radius:18px;padding:24px;width:min(680px,100%);max-height:90vh;overflow:auto}.modalbox h2{margin-top:0}.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}.field label{font-size:12px;color:var(--muted);font-weight:700}.modalactions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px}
+.notice{padding:12px 14px;border-radius:10px;background:#fff8e6;border:1px solid #f5dfaa;color:#795b0c;font-size:13px;margin-top:12px}.positive{color:var(--good)}.negative{color:var(--danger)}
+@media(max-width:900px){.side{width:70px}.brand{font-size:0}.brand:after{content:"EF";font-size:20px}.nav button{font-size:0;text-align:center}.main{margin-left:70px;width:calc(100% - 70px);padding:20px}.grid{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}}
+@media(max-width:600px){.grid{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr}.top{align-items:flex-start;gap:12px;flex-direction:column}.main{padding:15px}.two{display:block}.two .card{margin-bottom:15px}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side"><div class="brand">Expense<span>Flow</span></div><div class="nav">
+<button class="active" data-view="dashboard">▦ &nbsp; Dashboard</button>
+<button data-view="transactions">☷ &nbsp; Transactions</button>
+<button data-view="paste">＋ &nbsp; Bulk Import</button>
+<button data-view="others">◈ &nbsp; Other Expenses</button>
+<button data-view="year">▤ &nbsp; Year Summary</button>
+</div></aside>
+<main class="main">
+<div class="top"><div class="title"><h1>Personal Finance</h1><p id="subtitle">Track where your money goes.</p></div>
+<div class="actions"><select id="monthSelect"></select><button class="btn primary" id="addBtn">＋ Add expense</button></div></div>
+<div id="content"></div>
+</main></div>
+
+<div class="modal" id="modal"><div class="modalbox">
+<h2>Add expense</h2><div class="formgrid">
+<div class="field"><label>Date</label><input id="fDate" type="date"></div>
+<div class="field"><label>Amount (PHP)</label><input id="fAmount" type="number" step="0.01"></div>
+<div class="field full"><label>Description</label><input id="fDesc" placeholder="e.g. Lunch"></div>
+<div class="field"><label>Category</label><select id="fCat"><option>Food & Dining</option><option>House Payment</option><option>Transport</option><option>Shopping</option><option>Lodging</option><option>Bills</option><option>Savings</option><option>Other</option></select></div>
+</div><div class="modalactions"><button class="btn secondary" id="cancel">Cancel</button><button class="btn primary" id="save">Save expense</button></div>
+</div></div>
+
+<script>
+const july = [
+["2026-07-01",55,"Mototaxi"],["2026-07-01",105,"Lunch"],["2026-07-01",71,"Mototaxi"],["2026-07-01",49,"Chowking"],["2026-07-01",60,"Mini bus"],["2026-07-01",67,"Mototaxi"],
+["2026-07-02",269,"Mototaxi"],["2026-07-02",54,"Mototaxi"],["2026-07-02",100,"Lunch"],["2026-07-02",60,"Mototaxi"],["2026-07-02",898.37,"Manam"],["2026-07-02",60,"Mini Bus"],["2026-07-02",67,"Mototaxi"],
+["2026-07-04",138,"Angkas"],["2026-07-04",145,"Mototaxi"],["2026-07-04",1200,"KAIA shirt"],["2026-07-04",887.61,"Manam"],["2026-07-04",30,"Bus"],["2026-07-04",259,"Mcdo"],
+["2026-07-07",95,"Lunch"],["2026-07-07",200,"Caravan Black"],
+["2026-07-08",269,"Mototaxi"],["2026-07-08",55,"Mototaxi"],["2026-07-08",95,"Lunch"],["2026-07-08",58,"Lawson"],["2026-07-08",158,"Chowking"],["2026-07-08",100,"Beep load"],["2026-07-08",15,"Bus"],
+["2026-07-09",264.95,"Tiktokshop"],["2026-07-09",96,"Mototaxi"],["2026-07-09",556,"Nanyang"],["2026-07-09",103,"Mototaxi"],["2026-07-09",407.94,"Tiktokshop"],
+["2026-07-10",89,"Tiktokshop"],["2026-07-10",333.20,"Tiktokshop"],
+["2026-07-11",99,"Esim"],["2026-07-11",1000,"Airbnb Share"],
+["2026-07-13",799,"Smart Load"],["2026-07-13",269,"Mototaxi"],["2026-07-13",55,"Mototaxi"],["2026-07-13",165,"Lunch"],["2026-07-13",59,"Mototaxi"],["2026-07-13",57,"Mototaxi"],["2026-07-13",828,"Tim Ho Wan"],["2026-07-13",15,"Bus"],
+["2026-07-14",79,"Mototaxi"],["2026-07-14",105,"Lunch"],["2026-07-14",523.64,"Kiwami"],["2026-07-14",162,"Mototaxi"],
+["2026-07-15",56,"Mototaxi"],["2026-07-15",95,"Lunch"],["2026-07-15",149,"Mcdo"],["2026-07-15",80,"Mototaxi"],
+["2026-07-18",263,"Angkas"],["2026-07-18",290,"Hawkerchan"],["2026-07-18",390,"Enegry Gel"],["2026-07-18",667.75,"Supermarket"],["2026-07-18",302,"Grab Car"],["2026-07-18",673,"Grab Food (Food Panda)"],["2026-07-18",364,"Grab Food (Jollibee)"],["2026-07-18",201,"Grab Car"],["2026-07-18",576,"Nanyang"],["2026-07-18",60,"Mini bus"],["2026-07-18",82,"Mcdo"],["2026-07-18",67,"Mototaxi"],["2026-07-18",300,"Race photos"],
+["2026-07-21",269,"Mototaxi"],["2026-07-21",40,"Mototaxi"],["2026-07-21",85,"Lunch"],["2026-07-21",62,"Mototaxi"],["2026-07-21",223,"Chowking"],["2026-07-21",15,"Bus"],
+["2026-07-22",269,"Mototaxi"],["2026-07-22",38,"Mototaxi"],["2026-07-22",147,"Mercury"],["2026-07-22",130,"Lunch"],["2026-07-22",50,"Mototaxi"],["2026-07-22",60,"Mini bus"],["2026-07-22",179,"Mang Inasal"],["2026-07-22",76,"Mcdo"],["2026-07-22",69,"Mototaxi"],
+["2026-07-23",79,"Mototaxi"],["2026-07-23",305,"Lunch"],["2026-07-23",50,"Mototaxi"],["2026-07-23",3150,"Savings"],["2026-07-23",570,"Yoshinoya"],["2026-07-23",100,"Beep load"],["2026-07-23",252.85,"Tiktokshop"],["2026-07-23",15,"Bus"],["2026-07-23",59,"Mcdo"],
+["2026-07-25",1165.54,"Secret Recipe"],["2026-07-25",382,"Uniqlo"],["2026-07-25",640,"Snacks"],["2026-07-25",60,"Mini Bus"],["2026-07-25",67,"Mototaxi"],
+["2026-07-26",300,"Haircut"],
+["2026-07-27",269,"Mototaxi"],["2026-07-27",39,"Mototaxi"],["2026-07-27",130,"Lunch"],["2026-07-27",796,"Tim Ho Wan"],["2026-07-27",15,"Bus"],
+["2026-07-28",269,"Mototaxi"],["2026-07-28",39,"Mototaxi"],["2026-07-28",105,"Lunch"],["2026-07-28",269,"Coffee"],["2026-07-28",149,"Chowking"],["2026-07-28",60,"Mini bus"],["2026-07-28",66,"Mototaxi"],
+["2026-07-30",269,"Mototaxi"],["2026-07-30",38,"Mototaxi"],["2026-07-30",130,"Lunch"],["2026-07-30",50,"Mototaxi"]
+];
+const august = [
+["2026-08-01",260,"Mototaxi"],["2026-08-01",576,"Nanyang"],["2026-08-01",361,"Merienda"],["2026-08-01",358,"Komoro"],["2026-08-01",1733,"Airbnb (Tagaytay)"],["2026-08-01",80,"Bus"],["2026-08-01",137,"Mototaxi"],
+["2026-08-03",261,"Mototaxi"],["2026-08-03",203.45,"Shawarma (Grab)"],["2026-08-03",209,"Chowking"],["2026-08-03",62,"Mototaxi"],["2026-08-03",15,"Bus"],
+["2026-08-04",55,"Mototaxi"],["2026-08-04",160,"Lunch"],["2026-08-04",968.30,"Manam"],["2026-08-04",141.30,"Zus"],["2026-08-04",15,"Bus"],
+["2026-08-05",269,"Mototaxi"],["2026-08-05",38,"Mototaxi"],["2026-08-05",130,"Lunch"],["2026-08-05",255,"Marugame"],["2026-08-05",100,"Beep Load"],["2026-08-05",60,"Mini bus"],["2026-08-05",110.75,"Mercury"],["2026-08-05",69,"Mototaxi"],
+["2026-08-06",79,"Mototaxi"],["2026-08-06",149,"Mcdo"],["2026-08-06",256.91,"Tiktokshop"],["2026-08-06",964.02,"Watami"],["2026-08-06",326.33,"Tiktokshop"],
+["2026-08-07",2912,"CebPac (Baggage)"],
+["2026-08-08",187.86,"Tiktokshop"],["2026-08-08",250,"KSPH regi"],
+["2026-08-11",79,"Mototaxi"],["2026-08-11",100,"Lunch"],["2026-08-11",71,"Mototaxi"],["2026-08-11",180,"KFC"],["2026-08-11",40,"LM"],
+["2026-08-12",70,"Angkas"],["2026-08-12",60,"UV"],["2026-08-12",39,"Mototaxi"],["2026-08-12",199.25,"Zus"],["2026-08-12",95,"Lunch"],["2026-08-12",149,"Mcdo"],["2026-08-12",129,"Mcdo"],["2026-08-12",207,"Grab"],["2026-08-12",33,"Bus"],["2026-08-12",154,"Hive Hotel"],["2026-08-12",105,"711"],["2026-08-12",23,"711"],["2026-08-12",113,"Grab"],
+["2026-08-13",300,"Green gsm (Car)"],["2026-08-13",130,"Lunch"],["2026-08-13",700,"Tokyo Tokyo"],["2026-08-13",104,"Mototaxi"],
+["2026-08-14",249,"KSPH meal"],["2026-08-15",398.50,"Bench"],
+["2026-08-16",187,"Mototaxi"],["2026-08-16",100,"Beep load"],["2026-08-16",137,"Chowking"],["2026-08-16",30,"Bus"],["2026-08-16",50,"Tricycle"],
+["2026-08-20",79,"Mototaxi"],["2026-08-20",145,"Lunch"],["2026-08-20",588,"Tim Howan"],["2026-08-20",104,"Mototaxi"],
+["2026-08-21",704.98,"Tiktokshop"],["2026-08-22",238,"Merienda + Fare"],["2026-08-23",768.95,"Tiktokshop"],["2026-08-23",65.55,"Lazada"],
+["2026-08-24",268,"Mototaxi"],["2026-08-24",39,"Mototaxi"],["2026-08-24",154.30,"Zus Coffee Grab"],["2026-08-24",120,"Lunch"],["2026-08-24",60,"UV"],
+["2026-08-25",79,"Mototaxi"],["2026-08-25",95,"Lunch"],["2026-08-25",50,"Mototaxi"],["2026-08-25",193.92,"Tiktokshop"],
+["2026-08-26",97,"Mototaxi"],["2026-08-26",95,"Lunch"],["2026-08-26",1480,"Zus Coffee"],["2026-08-26",580,"Hawkerchan"],["2026-08-26",65,"Mototaxi"],["2026-08-26",15,"Bus"],
+["2026-08-29",150,"Grab"],["2026-08-29",211.97,"Airbnb"],["2026-08-29",200,"Tricycle"],["2026-08-29",135,"Mototaxi"],["2026-08-29",20,"Mineral"],["2026-08-29",20,"CR"],["2026-08-29",149.75,"Mercury"],["2026-08-29",145,"Bus"],["2026-08-29",944,"Dinner"],["2026-08-29",364.50,"Robinsons"],["2026-08-29",103.50,"Robinsons"],["2026-08-29",352,"Mang Inasal (Grab)"],["2026-08-29",475,"Chowking (Grab)"],["2026-08-29",617,"Shakeys"],["2026-08-29",77,"Bus"],["2026-08-29",60,"UV"],["2026-08-29",219,"llaо llao"],["2026-08-29",70,"Tricycle"]
+];
+const julyOthers=[["Deca Payment",11742],["Cess CP (16/24)",347.08],["Ipad (14/24)",895.42],["Precious Tuition",500],["Monthly Contribution Expenses",23968.23],["Inno Share",1000],["Adidas Gift Share (Dad, Mark)",2600]];
+const augustOthers=[["Deca Payment",11742],["Cess CP (17/24)",347.08],["Ipad (15/24)",895.42],["Google One",10],["Aircon Repair",3525],["Monthly Contribution Expenses",18246.69]];
+
+const key="expenseflow-v2";
+let store=JSON.parse(localStorage.getItem(key)||"null");
+if(!store) store={months:{"2026-07":{tx:july.map((x,i)=>({id:"j"+i,date:x[0],amount:x[1],desc:x[2],cat:cat(x[2])})),others:julyOthers.map((x,i)=>({id:"jo"+i,desc:x[0],amount:x[1]}))},"2026-08":{tx:august.map((x,i)=>({id:"a"+i,date:x[0],amount:x[1],desc:x[2],cat:cat(x[2])})),others:augustOthers.map((x,i)=>({id:"ao"+i,desc:x[0],amount:x[1]}))}}};
+let month=localStorage.getItem("expenseflow-month")||"2026-08";
+
+function migrateDeca(){
+  let changed=false;
+  Object.values(store.months||{}).forEach(d=>(d.tx||[]).forEach(x=>{
+    if(/deca payment/i.test(x.desc||"") && x.cat!=="House Payment"){x.cat="House Payment";changed=true;}
+  }));
+  if(changed && typeof save==="function")save();
+}
+migrateDeca();
+
+let view="dashboard";
+function cat(s){s=s.toLowerCase();if(s.includes("savings"))return" Savings".trim();if(/tiktokshop|lazada|uniqlo|kaia shirt|bench|caravan black|race photos|haircut/.test(s))return"Shopping";if(/airbnb|hotel/.test(s))return"Lodging";if(/mototaxi|angkas|grab car|mini bus|mini bus|bus|uv|tricycle|beep|smart load|green gsm|grab food/.test(s))return"Transport";if(/deca|cess|ipad|google one|aircon|tuition|contribution|inno share|adidas/.test(s))return"Bills";if(/nanyang|lunch|chow|manam|mcdo|zus|merienda|komoro|hawker|energy|supermarket|food|kfc|lawson|tim ho|kiwami|yoshinoya|secret recipe|snacks|coffee|mercury|tokyo|ksph|dinner|mang inasal|shakeys|llao/.test(s))return"Food & Dining";return"Other"}
+function money(n){return new Intl.NumberFormat("en-PH",{style:"currency",currency:"PHP"}).format(n)}
+function data(){return store.months[month]||(store.months[month]={tx:[],others:[]})}
+function save(){localStorage.setItem(key,JSON.stringify(store))}
+function totals(){let d=data(), daily=d.tx.reduce((a,x)=>a+x.amount,0), oth=d.others.reduce((a,x)=>a+x.amount,0);return{daily,oth,total:daily+oth}}
+function render(){populateMonths();document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===view));let name=new Date(month+"-01").toLocaleString("en-US",{month:"long",year:"numeric"});document.getElementById("subtitle").textContent=name+" • "+data().tx.length+" transactions";document.getElementById("content").innerHTML=view==="dashboard"?dashboard():view==="transactions"?transactions():view==="paste"?paste():view==="year"?yearSummary():others();bind();}
+function populateMonths(){let sel=document.getElementById("monthSelect");let keys=Object.keys(store.months).sort().reverse();sel.innerHTML=keys.map(k=>`<option value="${k}" ${k===month?"selected":""}>${new Date(k+"-01").toLocaleString("en-US",{month:"long",year:"numeric"})}</option>`).join("")}
+function dashboard(){let t=totals(),tx=data().tx, by={};tx.forEach(x=>by[x.cat]=(by[x.cat]||0)+x.amount);let cats=Object.entries(by).sort((a,b)=>b[1]-a[1]);let days={};tx.forEach(x=>days[x.date]=(days[x.date]||0)+x.amount);let ds=Object.entries(days).sort();let max=Math.max(...ds.map(x=>x[1]),1);return `<div class="grid">
+<div class="card kpi"><div class="label">Total expenses</div><div class="value">${money(t.total)}</div><small>Daily + other expenses</small></div>
+<div class="card kpi"><div class="label">Daily spending</div><div class="value">${money(t.daily)}</div><small>${tx.length} transactions</small></div>
+<div class="card kpi"><div class="label">Other expenses</div><div class="value">${money(t.oth)}</div><small>Recurring / separate items</small></div>
+<div class="card kpi"><div class="label">Avg. transaction</div><div class="value">${money(tx.length?t.daily/tx.length:0)}</div><small>Daily transactions only</small></div>
+</div>
+<div class="two"><div class="card"><div class="section-title"><h2>Daily spending</h2><span class="label">${ds.length} active days</span></div><div class="bars">${ds.map(([d,v])=>`<div class="barwrap"><div class="barvalue">${money(v).replace("₱","₱")}</div><div class="bar" style="height:${Math.max(2,v/max*165)}px"></div><div class="barlabel">${d.slice(5)}</div></div>`).join("")}</div></div>
+<div class="card"><div class="section-title"><h2>By category</h2></div><div class="cat">${cats.map(([c,v])=>`<div class="catrow"><span>${c}</span><div class="track"><div class="fill" style="width:${v/(cats[0]?.[1]||1)*100}%"></div></div><span class="catamt">${money(v)}</span></div>`).join("")}</div></div></div>
+<div class="card tablecard"><div class="section-title"><h2>Recent transactions</h2><button class="btn secondary" onclick="view='transactions';render()">View all</button></div>${table(tx.slice().reverse().slice(0,8))}</div>`}
+function table(tx){if(!tx.length)return'<div class="empty">No transactions yet.</div>';return `<div class="tablewrap"><table><thead><tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th><th></th></tr></thead><tbody>${tx.map(x=>`<tr><td>${x.date}</td><td>${esc(x.desc)}</td><td><span class="tag">${x.cat}</span></td><td class="amount">${money(x.amount)}</td><td><button class="btn secondary" style="padding:6px 9px" onclick="delTx('${x.id}')">Delete</button></td></tr>`).join("")}</tbody></table></div>`}
+function transactions(){return `<div class="card tablecard" style="margin-top:0"><div class="section-title"><h2>Transactions</h2><span>${data().tx.length} records</span></div><div class="filters"><input id="search" placeholder="Search description..."><select id="filterCat"><option value="">All categories</option>${["Food & Dining","Transport","Shopping","Lodging","Bills","Savings","Other"].map(x=>`<option>${x}</option>`).join("")}</select></div><div id="txTable">${table(data().tx.slice().reverse())}</div></div>`}
+function others(){let d=data();return `<div class="card" style="margin-top:0"><div class="section-title"><h2>Other expenses</h2><button class="btn primary" onclick="addOther()">＋ Add other expense</button></div><div class="notice">These are kept separate from daily transaction spending and included in the monthly total.</div>${d.others.length?`<div class="tablewrap" style="margin-top:15px"><table><thead><tr><th>Description</th><th style="text-align:right">Amount</th><th></th></tr></thead><tbody>${d.others.map(x=>`<tr><td>${esc(x.desc)}</td><td class="amount">${money(x.amount)}</td><td><button class="btn secondary" style="padding:6px 9px" onclick="delOther('${x.id}')">Delete</button></td></tr>`).join("")}</tbody></table></div>`:'<div class="empty">No other expenses yet.</div>'}</div>`}
+
+function allYearTransactions(year){
+  const result=[];
+  Object.entries(store.months||{}).forEach(([month,data])=>{
+    if(month.slice(0,4)===String(year)){
+      (data.tx||[]).forEach(x=>result.push({...x,sourceMonth:month}));
+      (data.others||[]).forEach(x=>result.push({...x,date:x.date||month+"-01",sourceMonth:month}));
+    }
+  });
+  return result;
+}
+function yearSummary(){
+  const years=[...new Set(Object.keys(store.months||{}).map(x=>x.slice(0,4)))].filter(Boolean).sort().reverse();
+  const year=years[0]||String(new Date().getFullYear());
+  const tx=allYearTransactions(year);
+  const total=tx.reduce((s,x)=>s+Number(x.amount||0),0);
+  const cats={}, months={};
+  tx.forEach(x=>{
+    const c=/deca payment/i.test(x.desc||"")?"House Payment":(x.cat||cat(x.desc||""));
+    cats[c]=(cats[c]||0)+Number(x.amount||0);
+    const m=(x.date||x.sourceMonth||"").slice(0,7);
+    if(m)months[m]=(months[m]||0)+Number(x.amount||0);
+  });
+  const rows=Array.from({length:12},(_,i)=>{
+    const key=year+"-"+String(i+1).padStart(2,"0");
+    return {key,total:months[key]||0,count:tx.filter(x=>(x.date||x.sourceMonth||"").startsWith(key)).length};
+  });
+  const active=rows.filter(x=>x.total>0), avg=active.length?total/active.length:0;
+  const topMonth=[...rows].sort((a,b)=>b.total-a.total)[0];
+  const topCat=Object.entries(cats).sort((a,b)=>b[1]-a[1])[0];
+  const mf=v=>typeof money==="function"?money(v):"₱"+Number(v).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const ef=v=>typeof esc==="function"?esc(v):String(v).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+  const maxM=Math.max(...rows.map(x=>x.total),1), maxC=Math.max(...Object.values(cats),1);
+  return `<div class="grid">
+    <div class="card kpi"><div class="label">Year total</div><div class="value">${mf(total)}</div><small>${year} • all expenses</small></div>
+    <div class="card kpi"><div class="label">Average / active month</div><div class="value">${mf(avg)}</div><small>${active.length} active month${active.length===1?"":"s"}</small></div>
+    <div class="card kpi"><div class="label">Highest month</div><div class="value">${topMonth.total?mf(topMonth.total):"—"}</div><small>${new Date(topMonth.key+"-01").toLocaleString("en-US",{month:"long"})}</small></div>
+    <div class="card kpi"><div class="label">Top category</div><div class="value">${topCat?ef(topCat[0]):"—"}</div><small>${topCat?mf(topCat[1]):"No data"}</small></div>
+  </div>
+  <div class="two">
+    <div class="card"><div class="section-title"><h2>${year} Monthly Spending</h2><span>${tx.length} records</span></div>
+      <div class="bars">${rows.map(x=>`<div class="barwrap"><div class="barvalue">${x.total?mf(x.total):""}</div><div class="bar" style="height:${Math.max(2,Math.round(x.total/maxM*165))}px"></div><div class="barlabel">${new Date(x.key+"-01").toLocaleString("en-US",{month:"short"})}</div></div>`).join("")}</div>
+    </div>
+    <div class="card"><div class="section-title"><h2>Category Breakdown</h2></div>
+      ${Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<div class="catrow"><span>${ef(c)}</span><div class="track"><div class="fill" style="width:${v/maxC*100}%"></div></div><span class="catamt">${mf(v)}</span></div>`).join("")||'<div class="empty">No expenses yet.</div>'}
+    </div>
+  </div>
+  <div class="card tablecard"><div class="section-title"><h2>Monthly Breakdown</h2><span>${year}</span></div>
+    <div class="tablewrap"><table><thead><tr><th>Month</th><th>Transactions</th><th style="text-align:right">Total</th></tr></thead><tbody>
+    ${rows.map(x=>`<tr><td>${new Date(x.key+"-01").toLocaleString("en-US",{month:"long",year:"numeric"})}</td><td>${x.count}</td><td class="amount">${mf(x.total)}</td></tr>`).join("")}
+    <tr><td><b>Year Total</b></td><td><b>${tx.length}</b></td><td class="amount"><b>${mf(total)}</b></td></tr>
+    </tbody></table></div>
+  </div>
+  <div class="notice"><b>House Payment:</b> Deca Payment is automatically categorized as House Payment.</div>`;
+}
+
+function paste(){return `<div class="card" style="margin-top:0"><div class="section-title"><h2>Bulk import</h2><button class="btn primary" id="importBtn">Import transactions</button></div><p style="color:var(--muted);font-size:13px">Paste your original format. The app detects dates and lines like <b>260 - Mototaxi</b>. Lines beginning with “Total:” are ignored because the app calculates totals automatically.</p><textarea id="bulk" style="width:100%;height:390px" placeholder="July 1\n\n55 - Mototaxi\n105 - Lunch\n71 - Mototaxi"></textarea><div class="notice">Tip: You can paste an entire month at once. Dates such as “08/29 - 08/31” are accepted and stored under the first date.</div></div>`}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+function bind(){document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>{view=b.dataset.view;render()});document.getElementById("monthSelect").onchange=e=>{month=e.target.value;localStorage.setItem("expenseflow-month",month);render()};document.getElementById("addBtn").onclick=()=>openModal();let imp=document.getElementById("importBtn");if(imp)imp.onclick=importBulk;let search=document.getElementById("search"),fc=document.getElementById("filterCat");if(search){let f=()=>{let q=search.value.toLowerCase(),c=fc.value;document.getElementById("txTable").innerHTML=table(data().tx.slice().reverse().filter(x=>(!q||x.desc.toLowerCase().includes(q))&&(!c||x.cat===c)))};search.oninput=f;fc.onchange=f}}
+function openModal(){document.getElementById("modal").classList.add("open");document.getElementById("fDate").value=month+"-01"}
+document.getElementById("cancel").onclick=()=>document.getElementById("modal").classList.remove("open");
+document.getElementById("save").onclick=()=>{let date=document.getElementById("fDate").value,amount=Number(document.getElementById("fAmount").value),desc=document.getElementById("fDesc").value.trim(),c=document.getElementById("fCat").value;if(!date||!amount||!desc)return alert("Please complete the fields.");let m=date.slice(0,7);if(!store.months[m])store.months[m]={tx:[],others:[]};store.months[m].tx.push({id:crypto.randomUUID(),date,amount,desc,cat:c});month=m;save();localStorage.setItem("expenseflow-month",month);document.getElementById("modal").classList.remove("open");render()};
+function delTx(id){if(confirm("Delete this transaction?")){data().tx=data().tx.filter(x=>x.id!==id);save();render()}}
+function delOther(id){if(confirm("Delete this other expense?")){data().others=data().others.filter(x=>x.id!==id);save();render()}}
+function addOther(){let desc=prompt("Description");if(!desc)return;let amount=Number(prompt("Amount (PHP)"));if(!amount)return;data().others.push({id:crypto.randomUUID(),desc,amount});save();render()}
+function importBulk(){let text=document.getElementById("bulk").value;let lines=text.split(/\r?\n/),current=null,count=0;for(let raw of lines){let line=raw.trim();if(!line)continue;let dm=line.match(/^(?:July|August|September|October|November|December|January|February|March|April|May|June)\s+(\d{1,2})(?:\s*-\s*(\d{1,2}))?$/i)||line.match(/^(\d{1,2})\/(\d{1,2})(?:\s*-\s*\d{1,2}\/\d{1,2})?$/);if(dm){let s=line.toLowerCase(),mm=s.match(/^([a-z]+)/);let y=2026,mo;if(mm){mo=new Date(Date.parse(mm[1]+" 1, 2026")).getMonth()+1}else{mo=Number(line.split("/")[0])};current=`${y}-${String(mo).padStart(2,"0")}-${String(Number(dm[1])).padStart(2,"0")}`;continue}let em=line.match(/^([\d,]+(?:\.\d+)?)\s*-\s*(.+)$/);if(em&&current){let amount=Number(em[1].replace(/,/g,"")),desc=em[2].trim(),m=current.slice(0,7);if(!store.months[m])store.months[m]={tx:[],others:[]};store.months[m].tx.push({id:crypto.randomUUID(),date:current,amount,desc,cat:cat(desc)});count++}}save();alert(`Imported ${count} transactions.`);month=current?current.slice(0,7):month;localStorage.setItem("expenseflow-month",month);render()}
+render();
+</script>
+</body></html>
