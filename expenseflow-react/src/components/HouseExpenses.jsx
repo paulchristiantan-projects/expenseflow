@@ -1,0 +1,661 @@
+import { useState, useMemo } from "react";
+import { money, monthLabel } from "../helpers";
+import { IconTrash, IconEdit, IconPlus } from "./Icons";
+
+// ── Constants ────────────────────────────────────────────────────────────────
+export const HOUSE_CATEGORIES = [
+  { key: "Electricity",      icon: "electricity" },
+  { key: "Water",            icon: "water"        },
+  { key: "Internet",         icon: "internet"     },
+  { key: "House Payment",    icon: "house"        },
+  { key: "Association Dues", icon: "dues"         },
+  { key: "Groceries/Market", icon: "grocery"      },
+];
+
+export function HouseCatIcon({ type, size = 16 }) {
+  const s = { width: size, height: size, display: "inline-block", flexShrink: 0 };
+  const p = { fill: "none", stroke: "var(--accent)", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" };
+  switch (type) {
+    case "electricity": return (
+      <svg style={s} viewBox="0 0 16 16" {...p}>
+        <path d="M9 1L4 9h5l-2 6 7-8H9z" fill="var(--accent-bg)" stroke="var(--accent)"/>
+      </svg>
+    );
+    case "water": return (
+      <svg style={s} viewBox="0 0 16 16" {...p}>
+        <path d="M8 2C8 2 3 7.5 3 10.5a5 5 0 0 0 10 0C13 7.5 8 2 8 2z" fill="var(--accent-bg)"/>
+      </svg>
+    );
+    case "internet": return (
+      <svg style={s} viewBox="0 0 16 16" {...p}>
+        <circle cx="8" cy="8" r="6"/>
+        <path d="M2 8h12M8 2c-2 2-3 4-3 6s1 4 3 6M8 2c2 2 3 4 3 6s-1 4-3 6"/>
+      </svg>
+    );
+    case "house": return (
+      <svg style={s} viewBox="0 0 16 16" {...p}>
+        <path d="M1 7l7-5 7 5v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z" fill="var(--accent-bg)"/>
+        <path d="M5.5 14V9h5v5"/>
+      </svg>
+    );
+    case "dues": return (
+      <svg style={s} viewBox="0 0 16 16" {...p}>
+        <rect x="1" y="5" width="14" height="9" rx="1.5" fill="var(--accent-bg)"/>
+        <path d="M4 5V3.5A2.5 2.5 0 0 1 6.5 1h3A2.5 2.5 0 0 1 12 3.5V5"/>
+        <circle cx="8" cy="9.5" r="1.5" fill="var(--accent)" stroke="none"/>
+      </svg>
+    );
+    case "grocery": return (
+      <svg style={s} viewBox="0 0 16 16" {...p}>
+        <path d="M2 2h1.5l2 7h7l1.5-5H5" fill="var(--accent-bg)"/>
+        <circle cx="6.5" cy="12.5" r="1" fill="var(--accent)" stroke="none"/>
+        <circle cx="11" cy="12.5" r="1" fill="var(--accent)" stroke="none"/>
+      </svg>
+    );
+    default: return null;
+  }
+}
+
+export const GROCERY_SUBCATS = ["Food", "Mineral", "Others", "Dad", "Precious Allowance"];
+
+export const USAGE_CONFIG = {
+  "Electricity": { label: "kWh used",     placeholder: "e.g. 312.5", unit: "kWh" },
+  "Water":       { label: "Cubic meters", placeholder: "e.g. 14.2",  unit: "m³"  },
+};
+
+/**
+ * Returns per-category totals for house bills, but overrides Groceries/Market
+ * with the sum of grocery items when any items exist for that month.
+ * allHouse: all house bill entries, allGrocery: all grocery items, month: "YYYY-MM"
+ */
+export function effectiveHouseBycat(houseEntries, groceryEntries) {
+  const bycat = Object.fromEntries(HOUSE_CATEGORIES.map(({ key }) => [key, 0]));
+  houseEntries.forEach((x) => { if (bycat[x.cat] !== undefined) bycat[x.cat] += x.amount; });
+  const groceryTotal = groceryEntries.reduce((s, x) => s + x.amount, 0);
+  if (groceryEntries.length > 0) bycat["Groceries/Market"] = groceryTotal;
+  return bycat;
+}
+
+const YEAR_OPTIONS = (() => {
+  const now = new Date().getFullYear();
+  const out = [];
+  for (let y = now + 1; y >= 2020; y--) out.push(y);
+  return out;
+})();
+
+const MONTH_NAMES = {
+  january:1,february:2,march:3,april:4,may:5,june:6,
+  july:7,august:8,september:9,october:10,november:11,december:12,
+  jan:1,feb:2,mar:3,apr:4,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12,
+};
+
+// ── Parsers ──────────────────────────────────────────────────────────────────
+function matchCat(raw) {
+  const s = (raw || "").trim().toLowerCase();
+  return HOUSE_CATEGORIES.find((c) => c.key.toLowerCase() === s)?.key || null;
+}
+function matchSubcat(raw) {
+  const s = (raw || "").trim().toLowerCase();
+  return GROCERY_SUBCATS.find((c) => c.toLowerCase() === s) || null;
+}
+
+export function parseHouseBulk(text, defaultYear = new Date().getFullYear()) {
+  const rows = [], errors = [];
+  let currentCat = null, currentYear = defaultYear;
+  (text || "").split(/\r?\n/).forEach((line, i) => {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) return;
+    if (/^(20\d{2})$/.test(t)) { currentYear = Number(t); return; }
+    const asCat = matchCat(t);
+    if (asCat) { currentCat = asCat; return; }
+    const m = t.match(/^([a-z]+)[,\s]+([0-9,]+(?:\.\d+)?)(?:[,\s]+([0-9,]+(?:\.\d+)?))?$/i);
+    if (m) {
+      const moNum = MONTH_NAMES[m[1].toLowerCase()];
+      if (!moNum) { errors.push(`Line ${i+1}: unknown month "${m[1]}"`); return; }
+      const amount = Number(m[2].replace(/,/g,""));
+      if (!amount) return;
+      if (!currentCat) { errors.push(`Line ${i+1}: amount before category`); return; }
+      const month = `${currentYear}-${String(moNum).padStart(2,"0")}`;
+      const usage = m[3] ? Number(m[3].replace(/,/g,"")) : null;
+      rows.push({ cat: currentCat, amount, month, note: "", usage });
+      return;
+    }
+    errors.push(`Line ${i+1}: unrecognized — "${t}"`);
+  });
+  return { rows, errors };
+}
+
+export function parseGroceryBulk(text, defaultYear = new Date().getFullYear()) {
+  const rows = [], errors = [];
+  let currentYear = defaultYear, currentMonth = null, currentSubcat = null;
+  (text || "").split(/\r?\n/).forEach((line, i) => {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) return;
+    if (/^(20\d{2})$/.test(t)) { currentYear = Number(t); return; }
+    const moNum = MONTH_NAMES[t.toLowerCase()];
+    if (moNum) { currentMonth = `${currentYear}-${String(moNum).padStart(2,"0")}`; currentSubcat = null; return; }
+    const asSubcat = matchSubcat(t);
+    if (asSubcat) { currentSubcat = asSubcat; return; }
+    const m = t.match(/^([\d,]+(?:\.\d+)?)\s*-\s*(.+)$/);
+    if (m) {
+      if (!currentMonth)  { errors.push(`Line ${i+1}: amount before month`); return; }
+      if (!currentSubcat) { errors.push(`Line ${i+1}: amount before sub-category`); return; }
+      const amount = Number(m[1].replace(/,/g,""));
+      if (!amount) return;
+      rows.push({ subcat: currentSubcat, desc: m[2].trim(), amount, month: currentMonth });
+      return;
+    }
+    errors.push(`Line ${i+1}: unrecognized — "${t}"`);
+  });
+  return { rows, errors };
+}
+
+// ── Bills Import Panel ────────────────────────────────────────────────────────
+const BILLS_EXAMPLE = `2026\n\nElectricity\nJanuary, 7302.54, 312.5\nFebruary, 6948.82, 298.1\n\nWater\nJanuary, 450, 14.2\nFebruary, 480, 15.1\n\nInternet\nJanuary, 1499\nFebruary, 1499\n\nHouse Payment\nJanuary, 8500\n\nAssociation Dues\nJanuary, 500\n\nGroceries/Market\nJanuary, 6200`;
+
+function BillsImportPanel({ onImport, onClose }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [year, setYear] = useState(new Date().getFullYear());
+  function handlePreview() { setPreview(parseHouseBulk(text, year)); }
+  async function handleImport() {
+    if (!preview?.rows?.length) return;
+    setBusy(true);
+    try { await onImport(preview.rows); alert(`Imported ${preview.rows.length} entries.`); setText(""); setPreview(null); onClose(); }
+    catch (e) { alert("Import failed: " + e.message); }
+    finally { setBusy(false); }
+  }
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+      <div className="notice" style={{ lineHeight:1.8 }}>
+        Year → Category → <code>Month, amount[, usage]</code>.<br/>
+        Electricity: 3rd value = kWh &nbsp;|&nbsp; Water: 3rd value = m³.<br/>
+        Categories: {HOUSE_CATEGORIES.map(({ key }) => <code key={key} style={{ marginRight:4 }}>{key}</code>)}
+      </div>
+      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+        <label style={{ fontSize:12, fontWeight:600, color:"var(--muted)" }}>Default year</label>
+        <select value={year} onChange={(e) => { setYear(Number(e.target.value)); setPreview(null); }}>
+          {YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
+      <textarea style={{ width:"100%", height:300, fontFamily:"monospace", fontSize:13 }}
+        placeholder={BILLS_EXAMPLE} value={text}
+        onChange={(e) => { setText(e.target.value); setPreview(null); }}/>
+      <div style={{ display:"flex", gap:8 }}>
+        <button className="btn secondary" onClick={handlePreview} disabled={!text.trim()}>Preview</button>
+        {preview?.rows?.length > 0 && (
+          <button className="btn primary" onClick={handleImport} disabled={busy}>
+            {busy ? "Importing…" : `Import ${preview.rows.length} rows`}
+          </button>
+        )}
+      </div>
+      {preview && <>
+        {preview.errors.length > 0 && <div style={{ color:"var(--danger)", fontSize:13 }}>{preview.errors.map((e,i) => <div key={i}>⚠ {e}</div>)}</div>}
+        {preview.rows.length > 0 && (
+          <div className="tablewrap">
+            <table>
+              <thead><tr><th>Category</th><th>Month</th><th style={{ textAlign:"right" }}>Amount</th><th style={{ textAlign:"right" }}>Usage</th></tr></thead>
+              <tbody>
+                {preview.rows.map((r,i) => {
+                  const uc = USAGE_CONFIG[r.cat];
+                  return (
+                    <tr key={i}>
+                        <td style={{ display:"flex", alignItems:"center", gap:6 }}>
+                          <HouseCatIcon type={HOUSE_CATEGORIES.find((c) => c.key === r.cat)?.icon} size={14}/> {r.cat}
+                        </td>
+                      <td>{monthLabel(r.month, { month:"short", year:"numeric" })}</td>
+                      <td className="amount">{money(r.amount)}</td>
+                      <td style={{ textAlign:"right", color:"var(--muted)", fontSize:13 }}>{uc && r.usage != null ? `${r.usage} ${uc.unit}` : "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </>}
+    </div>
+  );
+}
+
+// ── Grocery Import Panel ──────────────────────────────────────────────────────
+const GROCERY_EXAMPLE = `2026\n\nJanuary\nFood\n250 - Rice\n180 - Chicken\n95 - Vegetables\n\nMineral\n120 - Distilled water\n\nOthers\n350 - Cleaning supplies\n\nDad\n500 - Allowance\n\nPrecious Allowance\n1500 - Monthly allowance\n\nFebruary\nFood\n280 - Rice\n200 - Pork`;
+
+function GroceryImportPanel({ onImport, onClose }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [year, setYear] = useState(new Date().getFullYear());
+  function handlePreview() { setPreview(parseGroceryBulk(text, year)); }
+  async function handleImport() {
+    if (!preview?.rows?.length) return;
+    setBusy(true);
+    try { await onImport(preview.rows); alert(`Imported ${preview.rows.length} grocery items.`); setText(""); setPreview(null); onClose(); }
+    catch (e) { alert("Import failed: " + e.message); }
+    finally { setBusy(false); }
+  }
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+      <div className="notice" style={{ lineHeight:1.8 }}>
+        Year → Month → Sub-category → <code>amount - description</code>.<br/>
+        Sub-categories: {GROCERY_SUBCATS.map((s) => <code key={s} style={{ marginRight:4 }}>{s}</code>)}<br/>
+        Blank lines and <code>#</code> comments ignored.
+      </div>
+      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+        <label style={{ fontSize:12, fontWeight:600, color:"var(--muted)" }}>Default year</label>
+        <select value={year} onChange={(e) => { setYear(Number(e.target.value)); setPreview(null); }}>
+          {YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
+      <textarea style={{ width:"100%", height:300, fontFamily:"monospace", fontSize:13 }}
+        placeholder={GROCERY_EXAMPLE} value={text}
+        onChange={(e) => { setText(e.target.value); setPreview(null); }}/>
+      <div style={{ display:"flex", gap:8 }}>
+        <button className="btn secondary" onClick={handlePreview} disabled={!text.trim()}>Preview</button>
+        {preview?.rows?.length > 0 && (
+          <button className="btn primary" onClick={handleImport} disabled={busy}>
+            {busy ? "Importing…" : `Import ${preview.rows.length} items`}
+          </button>
+        )}
+      </div>
+      {preview && <>
+        {preview.errors.length > 0 && <div style={{ color:"var(--danger)", fontSize:13 }}>{preview.errors.map((e,i) => <div key={i}>⚠ {e}</div>)}</div>}
+        {preview.rows.length > 0 && (
+          <div className="tablewrap">
+            <table>
+              <thead><tr><th>Sub-category</th><th>Month</th><th>Description</th><th style={{ textAlign:"right" }}>Amount</th></tr></thead>
+              <tbody>
+                {preview.rows.map((r,i) => (
+                  <tr key={i}>
+                    <td><span className="tag">{r.subcat}</span></td>
+                    <td style={{ whiteSpace:"nowrap" }}>{monthLabel(r.month, { month:"short", year:"numeric" })}</td>
+                    <td>{r.desc}</td>
+                    <td className="amount">{money(r.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </>}
+    </div>
+  );
+}
+
+// ── Combined Bulk Import Panel (exported for standalone page) ─────────────────
+export function HouseBulkImport({ onImport, onImportGrocery }) {
+  const [importTab, setImportTab] = useState("bills");
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:14, marginTop:12 }}>
+      <div style={{ display:"flex", gap:6, borderBottom:"1px solid var(--line)", paddingBottom:10 }}>
+        <button className={importTab === "bills" ? "btn primary" : "btn secondary"} style={{ fontSize:13 }} onClick={() => setImportTab("bills")}>
+          🏠 House Bills
+        </button>
+        <button className={importTab === "grocery" ? "btn primary" : "btn secondary"} style={{ fontSize:13 }} onClick={() => setImportTab("grocery")}>
+          🛒 Grocery List
+        </button>
+      </div>
+      {importTab === "bills"
+        ? <BillsImportPanel onImport={onImport} onClose={() => {}} />
+        : <GroceryImportPanel onImport={onImportGrocery} onClose={() => {}} />
+      }
+    </div>
+  );
+}
+
+// ── Entry Modal ───────────────────────────────────────────────────────────────
+function EntryModal({ initial, month, onSave, onClose }) {
+  const [cat,   setCat]   = useState(initial?.cat    || HOUSE_CATEGORIES[0].key);
+  const [amount,setAmount]= useState(initial?.amount != null ? String(initial.amount) : "");
+  const [note,  setNote]  = useState(initial?.note   || "");
+  const [usage, setUsage] = useState(initial?.usage  != null ? String(initial.usage) : "");
+  const usageCfg = USAGE_CONFIG[cat];
+  const S = { display:"block", width:"100%", marginTop:6, padding:"8px 10px", borderRadius:8, border:"1px solid var(--line)", fontSize:14, background:"var(--bg)", color:"var(--text)" };
+  const L = { fontSize:12, fontWeight:600, color:"var(--muted)", textTransform:"uppercase", letterSpacing:.5 };
+  function submit(e) {
+    e.preventDefault();
+    if (!amount || isNaN(Number(amount))) return;
+    onSave({ category:cat, amount:Number(amount), note, usage: usage ? Number(usage) : null, month });
+  }
+  return (
+    <div className="modal open" onClick={onClose}>
+      <div className="modalbox" style={{ maxWidth:420 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+          <h2 style={{ margin:0, fontSize:16 }}>{initial ? "Edit" : "Add"} House Expense</h2>
+          <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--muted)", fontSize:18, lineHeight:1, padding:4 }}>✕</button>
+        </div>
+        <form onSubmit={submit} style={{ display:"flex", flexDirection:"column", gap:12 }}>
+          <label style={L}>Category
+            <select value={cat} onChange={(e) => { setCat(e.target.value); setUsage(""); }} style={S}>
+              {HOUSE_CATEGORIES.map(({ key, icon }) => <option key={key} value={key}>{icon} {key}</option>)}
+            </select>
+          </label>
+          <label style={L}>Amount (PHP)
+            <input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" required autoFocus style={S}/>
+          </label>
+          {usageCfg && (
+            <label style={L}>{usageCfg.label}
+              <div style={{ position:"relative" }}>
+                <input type="number" min="0" step="0.01" value={usage} onChange={(e) => setUsage(e.target.value)} placeholder={usageCfg.placeholder} style={{ ...S, paddingRight:44 }}/>
+                <span style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", fontSize:12, color:"var(--muted)", pointerEvents:"none" }}>{usageCfg.unit}</span>
+              </div>
+            </label>
+          )}
+          <label style={L}>Note (optional)
+            <input type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Meralco Jan bill" style={S}/>
+          </label>
+          <div style={{ display:"flex", gap:8, justifyContent:"flex-end", marginTop:4 }}>
+            <button type="button" className="btn secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn primary"><IconPlus size={14}/> {initial ? "Save" : "Add"}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Monthly Summary (exported for standalone page) ───────────────────────────
+export function HouseMonthlySummary({ allHouse, allGrocery = [] }) {
+  const availableYears = useMemo(() => {
+    const years = [...new Set(allHouse.map((x) => x.month?.slice(0,4)).filter(Boolean))].sort().reverse();
+    if (!years.length) years.push(String(new Date().getFullYear()));
+    return years;
+  }, [allHouse]);
+
+  const [summaryYear, setSummaryYear] = useState(() => String(new Date().getFullYear()));
+  const resolvedYear = availableYears.includes(summaryYear) ? summaryYear : availableYears[0];
+
+  // All 12 months for the selected year
+  const rows = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => {
+      const key = `${resolvedYear}-${String(i + 1).padStart(2, "0")}`;
+      const entries = allHouse.filter((x) => x.month === key);
+      const groceryEntries = allGrocery.filter((x) => x.month === key);
+      const bycat = effectiveHouseBycat(entries, groceryEntries);
+      const total = Object.values(bycat).reduce((s, v) => s + v, 0);
+      return { key, total, bycat, count: entries.length };
+    });
+  }, [allHouse, allGrocery, resolvedYear]);
+
+  const yearTotal = rows.reduce((s, r) => s + r.total, 0);
+  const active = rows.filter((r) => r.total > 0);
+  const avg = active.length ? yearTotal / active.length : 0;
+  const topMonth = [...rows].sort((a, b) => b.total - a.total)[0];
+
+  // Category totals for the year
+  const catTotals = useMemo(() =>
+    Object.fromEntries(HOUSE_CATEGORIES.map(({ key: k }) => [k, rows.reduce((s, r) => s + r.bycat[k], 0)])),
+  [rows]);
+  const topCat = HOUSE_CATEGORIES.map(({ key }) => [key, catTotals[key]]).sort((a, b) => b[1] - a[1])[0];
+  const maxCat = Math.max(...Object.values(catTotals), 1);
+  const maxM = Math.max(...rows.map((r) => r.total), 1);
+
+  if (!allHouse.length) return (
+    <div className="card" style={{ marginTop: 0 }}>
+      <div className="empty">No house expense data yet.</div>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Year picker */}
+      <div className="section-title" style={{ marginBottom: 0 }}>
+        <h2>Monthly Summary</h2>
+        <select value={resolvedYear} onChange={(e) => setSummaryYear(e.target.value)} disabled={!availableYears.length}>
+          {availableYears.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
+
+      {/* KPI cards */}
+      <div className="grid">
+        <div className="card kpi">
+          <div className="label">Year total</div>
+          <div className="value">{money(yearTotal)}</div>
+          <small>{resolvedYear} · all bills</small>
+        </div>
+        <div className="card kpi">
+          <div className="label">Avg / active month</div>
+          <div className="value">{money(avg)}</div>
+          <small>{active.length} active month{active.length === 1 ? "" : "s"}</small>
+        </div>
+        <div className="card kpi">
+          <div className="label">Highest month</div>
+          <div className="value">{topMonth?.total ? money(topMonth.total) : "—"}</div>
+          <small>{topMonth?.total ? new Date(topMonth.key + "-01").toLocaleString("en-US", { month: "long" }) : "No data"}</small>
+        </div>
+        <div className="card kpi">
+          <div className="label">Top category</div>
+          <div className="value" style={{ fontSize: 16 }}>{topCat?.[1] > 0 ? topCat[0] : "—"}</div>
+          <small>{topCat?.[1] > 0 ? money(topCat[1]) : "No data"}</small>
+        </div>
+      </div>
+
+      {/* Charts row */}
+      <div className="two">
+        {/* Monthly spending bar chart */}
+        <div className="card">
+          <div className="section-title">
+            <h2>{resolvedYear} Monthly Spending</h2>
+            <span>{allHouse.filter((x) => x.month?.startsWith(resolvedYear)).length} entries</span>
+          </div>
+          <div className="bars">
+            {rows.map((r) => (
+              <div className="barwrap" key={r.key}>
+                <div className="barvalue">{r.total ? money(r.total) : ""}</div>
+                <div className="bar" style={{ height: Math.max(2, Math.round((r.total / maxM) * 165)) }} />
+                <div className="barlabel">{new Date(r.key + "-01").toLocaleString("en-US", { month: "short" })}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Category breakdown */}
+        <div className="card">
+          <div className="section-title">
+            <h2>Category Breakdown</h2>
+          </div>
+          {yearTotal > 0 ? (
+            HOUSE_CATEGORIES.map(({ key, icon }) => (
+              <div className="catrow" key={key}>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <HouseCatIcon type={icon} size={13} /> {key}
+                </span>
+                <div className="track">
+                  <div className="fill" style={{ width: `${(catTotals[key] / maxCat) * 100}%` }} />
+                </div>
+                <span className="catamt">{catTotals[key] ? money(catTotals[key]) : "—"}</span>
+              </div>
+            ))
+          ) : (
+            <div className="empty">No expenses yet.</div>
+          )}
+        </div>
+      </div>
+
+      {/* Monthly breakdown table */}
+      <div className="card tablecard">
+        <div className="section-title">
+          <h2>Monthly Breakdown</h2>
+          <span>{resolvedYear}</span>
+        </div>
+        <div className="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Month</th>
+                {HOUSE_CATEGORIES.map(({ key, icon }) => (
+                  <th key={key} style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    <HouseCatIcon type={icon} size={12} /> {key}
+                  </th>
+                ))}
+                <th style={{ textAlign: "right" }}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.key} style={{ opacity: r.total === 0 ? 0.4 : 1 }}>
+                  <td style={{ whiteSpace: "nowrap" }}>{new Date(r.key + "-01").toLocaleString("en-US", { month: "long" })}</td>
+                  {HOUSE_CATEGORIES.map(({ key }) => (
+                    <td key={key} className="amount" style={{ color: r.bycat[key] ? "var(--text)" : "var(--muted)" }}>
+                      {r.bycat[key] ? money(r.bycat[key]) : "—"}
+                    </td>
+                  ))}
+                  <td className="amount" style={{ fontWeight: 600, color: r.total ? "var(--accent)" : "var(--muted)" }}>
+                    {r.total ? money(r.total) : "—"}
+                  </td>
+                </tr>
+              ))}
+              <tr>
+                <td><b>Year Total</b></td>
+                {HOUSE_CATEGORIES.map(({ key }) => (
+                  <td key={key} className="amount"><b>{catTotals[key] ? money(catTotals[key]) : "—"}</b></td>
+                ))}
+                <td className="amount"><b>{money(yearTotal)}</b></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
+export default function HouseExpenses({
+  house, month, onAdd, onUpdate, onDelete, allHouse,
+  grocery, allGrocery, onAddGrocery, onDelGrocery,
+}) {
+  const [modal, setModal] = useState(null);
+
+  const monthTotal = house.reduce((s,x) => s+x.amount, 0);
+
+  // Grocery breakdown for current month
+  const groceryBySubcat = useMemo(() =>
+    Object.fromEntries(GROCERY_SUBCATS.map((s) => [s, grocery.filter((x) => x.subcat === s)])),
+  [grocery]);
+  const groceryTotal = grocery.reduce((s,x) => s+x.amount, 0);
+
+  async function handleSave(data) {
+    if (modal?.id) await onUpdate(modal.id, { cat:data.category, amount:data.amount, note:data.note, usage:data.usage??null, month:data.month });
+    else await onAdd(data);
+    setModal(null);
+  }
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+
+      {/* ── House bills card ── */}
+      <div className="card" style={{ marginTop:0 }}>
+        <div className="section-header">
+          <h2>House Expenses — {monthLabel(month)}</h2>
+          <button className="btn primary" onClick={() => setModal("add")}><IconPlus size={14}/> Add</button>
+        </div>
+        <div className="notice">Track recurring household bills separately from daily spending.</div>
+        <>
+          {/* Category chips */}
+          <div style={{ display:"flex", flexWrap:"wrap", gap:8, margin:"14px 0 10px" }}>
+            {HOUSE_CATEGORIES.map(({ key, icon }) => {
+              const amt = house.filter((x) => x.cat===key).reduce((s,x)=>s+x.amount,0);
+              return (
+                <div key={key} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", borderRadius:20,
+                  background: amt?"var(--accent-bg)":"var(--bg)", border:`1px solid ${amt?"var(--accent-soft)":"var(--line)"}`,
+                  fontSize:13, color: amt?"var(--accent)":"var(--muted)" }}>
+                  <HouseCatIcon type={icon} size={15}/>
+                  <span style={{ fontWeight:500 }}>{key}</span>
+                  {amt > 0 && <span style={{ fontWeight:700 }}>{money(amt)}</span>}
+                </div>
+              );
+            })}
+          </div>
+          {house.length ? (
+            <div className="tablewrap" style={{ marginTop:8 }}>
+              <table>
+                <colgroup><col style={{ width:36 }}/><col/><col style={{ width:110 }}/><col/><col style={{ width:130 }}/><col style={{ width:48 }}/><col style={{ width:48 }}/></colgroup>
+                <thead><tr><th></th><th>Category</th><th style={{ textAlign:"right" }}>Usage</th><th>Note</th><th style={{ textAlign:"right" }}>Amount</th><th></th><th></th></tr></thead>
+                <tbody>
+                  {house.map((x) => {
+                    const meta = HOUSE_CATEGORIES.find((c) => c.key===x.cat)||{};
+                    const uc = USAGE_CONFIG[x.cat];
+                    return (
+                      <tr key={x.id}>
+                        <td style={{ textAlign:"center", paddingTop:2 }}><HouseCatIcon type={meta.icon} size={18}/></td>
+                        <td style={{ fontWeight:500 }}>{x.cat}</td>
+                        <td style={{ textAlign:"right", color:"var(--muted)", fontSize:13 }}>
+                          {uc && x.usage != null ? <span>{x.usage.toLocaleString()} <span style={{ fontSize:11 }}>{uc.unit}</span></span> : uc ? "—" : ""}
+                        </td>
+                        <td style={{ color:"var(--muted)", fontSize:13 }}>{x.note||"—"}</td>
+                        <td className="amount">{money(x.amount)}</td>
+                        <td className="col-action-cell">
+                          <button style={{ background:"none", border:"none", color:"var(--muted)", cursor:"pointer", padding:5, borderRadius:6, display:"inline-flex" }} title="Edit"
+                            onMouseEnter={(e)=>e.currentTarget.style.color="var(--accent)"} onMouseLeave={(e)=>e.currentTarget.style.color="var(--muted)"}
+                            onClick={() => setModal(x)}><IconEdit size={14}/></button>
+                        </td>
+                        <td className="col-action-cell">
+                          <button style={{ background:"none", border:"none", color:"var(--muted)", cursor:"pointer", padding:5, borderRadius:6, display:"inline-flex" }} title="Delete"
+                            onMouseEnter={(e)=>e.currentTarget.style.color="var(--danger)"} onMouseLeave={(e)=>e.currentTarget.style.color="var(--muted)"}
+                            onClick={() => { if(confirm(`Delete this ${x.cat} entry?`)) onDelete(x.id); }}><IconTrash/></button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot><tr><td colSpan={4} style={{ fontWeight:700, textAlign:"right", paddingRight:8, fontSize:13 }}>Total</td><td className="amount" style={{ fontWeight:700, color:"var(--accent)" }}>{money(monthTotal)}</td><td/><td/></tr></tfoot>
+              </table>
+            </div>
+          ) : <div className="empty">No house expenses yet for this month.</div>}
+        </>
+      </div>
+
+      {/* ── Grocery breakdown for current month ── */}
+      {grocery.length > 0 && (
+        <div className="card">
+          <div className="section-header" style={{ marginBottom:14 }}>
+            <h2>🛒 Grocery Breakdown — {monthLabel(month)}</h2>
+            {groceryTotal > 0 && <span style={{ fontWeight:700, color:"var(--accent)", fontSize:15 }}>{money(groceryTotal)}</span>}
+          </div>
+          {grocery.length === 0 ? (
+            <div className="empty">No grocery items yet for this month.</div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+              {GROCERY_SUBCATS.map((sub) => {
+                const items = groceryBySubcat[sub];
+                if (!items?.length) return null;
+                const subTotal = items.reduce((s,x)=>s+x.amount,0);
+                return (
+                  <div key={sub}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                      <span style={{ fontWeight:600, fontSize:13 }}>{sub}</span>
+                      <span style={{ fontWeight:700, fontSize:13, color:"var(--accent)" }}>{money(subTotal)}</span>
+                    </div>
+                    <div className="tablewrap">
+                      <table>
+                        <tbody>
+                          {items.map((x) => (
+                            <tr key={x.id}>
+                              <td style={{ color:"var(--muted)", fontSize:13 }}>{x.desc}</td>
+                              <td className="amount">{money(x.amount)}</td>
+                              <td className="col-action-cell">
+                                <button style={{ background:"none", border:"none", color:"var(--muted)", cursor:"pointer", padding:5, borderRadius:6, display:"inline-flex" }} title="Delete"
+                                  onMouseEnter={(e)=>e.currentTarget.style.color="var(--danger)"} onMouseLeave={(e)=>e.currentTarget.style.color="var(--muted)"}
+                                  onClick={() => { if(confirm(`Delete "${x.desc}"?`)) onDelGrocery(x.id); }}><IconTrash/></button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {modal && (
+        <EntryModal initial={modal==="add"?null:modal} month={month} onSave={handleSave} onClose={() => setModal(null)}/>
+      )}
+    </div>
+  );
+}

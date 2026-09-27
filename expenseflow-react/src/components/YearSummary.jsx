@@ -51,7 +51,7 @@ export default function YearSummary({ tx, others }) {
   return (
     <>
       <div className="section-title">
-        <h2>Year Summary</h2>
+        <h2>Monthly Summary</h2>
         <select
           value={year}
           onChange={(e) => setPicked(e.target.value)}
