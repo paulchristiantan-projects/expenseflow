@@ -24,44 +24,61 @@ export default function Transactions({ tx, onDelete, others, onAddOther, onDelet
           Recurring or one-off amounts kept separate from daily spending.
         </div>
         {others?.length ? (
-          <div className="tablewrap" style={{ marginTop: 12 }}>
-            <table>
-              <colgroup>
-                <col style={{ width: "auto" }} />
-                <col style={{ width: 130 }} />
-                <col style={{ width: 130 }} />
-                <col style={{ width: 48 }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>Description</th>
-                  <th>Category</th>
-                  <th style={{ textAlign: "right" }}>Amount</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {others.map((x) => (
-                  <tr key={x.id}>
-                    <td style={{ fontWeight: 500 }}>{x.desc}</td>
-                    <td><span className="tag">{x.cat || "Other"}</span></td>
-                    <td className="amount">{money(x.amount)}</td>
-                    <td className="col-action-cell">
-                      <button
-                        style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 5, borderRadius: 6, display: "inline-flex" }}
-                        title="Delete"
-                        onMouseEnter={(e) => e.currentTarget.style.color = "var(--danger)"}
-                        onMouseLeave={(e) => e.currentTarget.style.color = "var(--muted)"}
-                        onClick={() => onDeleteOther(x.id)}
-                      >
-                        <IconTrash />
-                      </button>
-                    </td>
+          <>
+            {/* Desktop table */}
+            <div className="tablewrap tx-table-desktop" style={{ marginTop: 12 }}>
+              <table>
+                <colgroup>
+                  <col style={{ width: "auto" }} />
+                  <col style={{ width: 130 }} />
+                  <col style={{ width: 130 }} />
+                  <col style={{ width: 48 }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Description</th>
+                    <th>Category</th>
+                    <th style={{ textAlign: "right" }}>Amount</th>
+                    <th></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {others.map((x) => (
+                    <tr key={x.id}>
+                      <td style={{ fontWeight: 500 }}>{x.desc}</td>
+                      <td><span className="tag">{x.cat || "Other"}</span></td>
+                      <td className="amount">{money(x.amount)}</td>
+                      <td className="col-action-cell">
+                        <button className="tx-delete-btn" title="Delete"
+                          onMouseEnter={(e) => e.currentTarget.style.color = "var(--danger)"}
+                          onMouseLeave={(e) => e.currentTarget.style.color = "var(--muted)"}
+                          onClick={() => onDeleteOther(x.id)}>
+                          <IconTrash />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* Mobile card list */}
+            <div className="tx-card-list" style={{ marginTop: 12 }}>
+              {others.map((x) => (
+                <div key={x.id} className="tx-card">
+                  <div className="tx-card-main">
+                    <div className="tx-card-desc">{x.desc}</div>
+                    <div className="tx-card-amount">{money(x.amount)}</div>
+                  </div>
+                  <div className="tx-card-meta">
+                    <span className="tag">{x.cat || "Other"}</span>
+                    <button className="tx-delete-btn" title="Delete" onClick={() => onDeleteOther(x.id)}>
+                      <IconTrash />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         ) : (
           <div className="empty">No other expenses yet.</div>
         )}

@@ -21,13 +21,6 @@ import {
   IconImport, IconProfile, IconLogout, IconLeaf, IconPlus, IconBudget, IconHouse, IconTravel,
 } from "./components/Icons";
 
-const NAV_BOTTOM = [
-  { key: "dashboard",    label: "Home",    Icon: IconHome },
-  { key: "budget",       label: "Budget",  Icon: IconBudget },
-  { key: "transactions", label: "Txns",    Icon: IconTransactions },
-  { key: "profile",      label: "Profile", Icon: IconProfile },
-];
-
 function getGreeting() {
   const h = new Date().getHours();
   if (h < 12) return "Good morning";
@@ -63,6 +56,7 @@ export default function App() {
   const [month,     setMonth]     = useState("2026-08");
   const [modalOpen, setModalOpen] = useState(false);
   const [theme,     setTheme]     = useState(() => localStorage.getItem("theme") || "light");
+  const [mobileNav, setMobileNav] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -123,98 +117,102 @@ export default function App() {
     || view === "personal-dashboard" || view === "personal-summary"
     || view === "shared-house" || view === "travel";
 
-  // Personal views that activate "Personal" parent
   const personalViews = ["personal-dashboard", "personal-summary", "transactions", "paste"];
+
+  function navTo(key) { setView(key); setMobileNav(false); }
+
+  const SideNav = () => (
+    <>
+      <div className="brand">
+        <div className="brand-icon"><IconLeaf size={17} /></div>
+        <div className="brand-name">Expense<span>Flow</span></div>
+      </div>
+      <div className="nav-section-label">Menu</div>
+      <nav className="nav">
+        <button className={view === "dashboard" ? "active" : ""} onClick={() => navTo("dashboard")}>
+          <span className="nav-icon"><IconHome /></span><span>Home</span>
+        </button>
+        <button className={view === "budget" ? "active" : ""} onClick={() => navTo("budget")}>
+          <span className="nav-icon"><IconBudget /></span><span>Budget</span>
+        </button>
+        <button className={personalViews.includes(view) ? "active" : ""} onClick={() => navTo("personal-dashboard")}>
+          <span className="nav-icon"><IconTransactions /></span><span>Personal</span>
+        </button>
+        <button className={`nav-sub ${view === "personal-dashboard" ? "active" : ""}`} onClick={() => navTo("personal-dashboard")}>
+          <span className="nav-icon"><IconHome /></span><span>Dashboard</span>
+        </button>
+        <button className={`nav-sub ${view === "personal-summary" ? "active" : ""}`} onClick={() => navTo("personal-summary")}>
+          <span className="nav-icon"><IconYear /></span><span>Monthly Summary</span>
+        </button>
+        <button className={`nav-sub ${view === "transactions" ? "active" : ""}`} onClick={() => navTo("transactions")}>
+          <span className="nav-icon"><IconTransactions /></span><span>Transactions</span>
+        </button>
+        <button className={`nav-sub ${view === "paste" ? "active" : ""}`} onClick={() => navTo("paste")}>
+          <span className="nav-icon"><IconImport /></span><span>Bulk Import</span>
+        </button>
+        <button className={view === "shared-house" ? "active" : ""} onClick={() => navTo("shared-house")}>
+          <span className="nav-icon"><IconHouse /></span>
+          <span>Shared House</span>
+          {sharedHouseStore.sharedHouses.length > 0 && (
+            <span style={{ marginLeft: "auto", background: "var(--accent)", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px", fontWeight: 700 }}>
+              {sharedHouseStore.sharedHouses.length}
+            </span>
+          )}
+        </button>
+        <button className={view === "travel" ? "active" : ""} onClick={() => navTo("travel")}>
+          <span className="nav-icon"><IconTravel /></span>
+          <span>Travel</span>
+          {travelStore.trips.length > 0 && (
+            <span style={{ marginLeft: "auto", background: "var(--accent)", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px", fontWeight: 700 }}>
+              {travelStore.trips.length}
+            </span>
+          )}
+        </button>
+        <hr className="nav-divider" />
+        <div className="nav-section-label">Account</div>
+        <button className={view === "profile" ? "active" : ""} onClick={() => navTo("profile")}>
+          <span className="nav-icon"><IconProfile /></span><span>Profile</span>
+        </button>
+        <button className="nav-danger" onClick={logout} title={user.email || ""}>
+          <span className="nav-icon"><IconLogout /></span><span>Sign out</span>
+        </button>
+      </nav>
+    </>
+  );
 
   return (
     <div className="app">
-      {/* ── Sidebar ── */}
+      {/* ── Desktop sidebar ── */}
       <aside className="side">
-        <div className="brand">
-          <div className="brand-icon"><IconLeaf size={17} /></div>
-          <div className="brand-name">Expense<span>Flow</span></div>
-        </div>
-
-        <div className="nav-section-label">Menu</div>
-        <nav className="nav">
-          <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}>
-            <span className="nav-icon"><IconHome /></span>
-            <span>Home</span>
-          </button>
-          <button className={view === "budget" ? "active" : ""} onClick={() => setView("budget")}>
-            <span className="nav-icon"><IconBudget /></span>
-            <span>Budget</span>
-          </button>
-
-          {/* Personal */}
-          <button className={personalViews.includes(view) ? "active" : ""} onClick={() => setView("personal-dashboard")}>
-            <span className="nav-icon"><IconTransactions /></span>
-            <span>Personal</span>
-          </button>
-          <button className={`nav-sub ${view === "personal-dashboard" ? "active" : ""}`} onClick={() => setView("personal-dashboard")}>
-            <span className="nav-icon"><IconHome /></span>
-            <span>Dashboard</span>
-          </button>
-          <button className={`nav-sub ${view === "personal-summary" ? "active" : ""}`} onClick={() => setView("personal-summary")}>
-            <span className="nav-icon"><IconYear /></span>
-            <span>Monthly Summary</span>
-          </button>
-          <button className={`nav-sub ${view === "transactions" ? "active" : ""}`} onClick={() => setView("transactions")}>
-            <span className="nav-icon"><IconTransactions /></span>
-            <span>Transactions</span>
-          </button>
-          <button className={`nav-sub ${view === "paste" ? "active" : ""}`} onClick={() => setView("paste")}>
-            <span className="nav-icon"><IconImport /></span>
-            <span>Bulk Import</span>
-          </button>
-
-          {/* Shared House */}
-          <button className={view === "shared-house" ? "active" : ""} onClick={() => setView("shared-house")}>
-            <span className="nav-icon"><IconHouse /></span>
-            <span>Shared House</span>
-            {sharedHouseStore.sharedHouses.length > 0 && (
-              <span style={{ marginLeft: "auto", background: "var(--accent)", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px", fontWeight: 700 }}>
-                {sharedHouseStore.sharedHouses.length}
-              </span>
-            )}
-          </button>
-
-          {/* Travel */}
-          <button className={view === "travel" ? "active" : ""} onClick={() => setView("travel")}>
-            <span className="nav-icon"><IconTravel /></span>
-            <span>Travel</span>
-            {travelStore.trips.length > 0 && (
-              <span style={{ marginLeft: "auto", background: "var(--accent)", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px", fontWeight: 700 }}>
-                {travelStore.trips.length}
-              </span>
-            )}
-          </button>
-
-          <hr className="nav-divider" />
-          <div className="nav-section-label">Account</div>
-
-          <button className={view === "profile" ? "active" : ""} onClick={() => setView("profile")}>
-            <span className="nav-icon"><IconProfile /></span>
-            <span>Profile</span>
-          </button>
-          <button className="nav-danger" onClick={logout} title={user.email || ""}>
-            <span className="nav-icon"><IconLogout /></span>
-            <span>Sign out</span>
-          </button>
-        </nav>
+        <SideNav />
       </aside>
 
-      {/* ── Bottom nav (mobile) ── */}
-      <nav className="bottom-nav">
-        <div className="bottom-nav-inner">
-          {NAV_BOTTOM.map(({ key, label, Icon }) => (
-            <button key={key} className={view === key ? "active" : ""} onClick={() => setView(key)}>
-              <Icon size={20} />
-              {label}
-            </button>
-          ))}
+      {/* ── Mobile: hamburger bar + drawer ── */}
+      <div className="mobile-topbar">
+        <button className="hamburger" onClick={() => setMobileNav(true)} aria-label="Open menu">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="3" y1="6" x2="19" y2="6"/><line x1="3" y1="11" x2="19" y2="11"/><line x1="3" y1="16" x2="19" y2="16"/>
+          </svg>
+        </button>
+        <div className="brand" style={{ padding: 0 }}>
+          <div className="brand-icon"><IconLeaf size={15} /></div>
+          <div className="brand-name" style={{ fontSize: 15 }}>Expense<span>Flow</span></div>
         </div>
-      </nav>
+        <div style={{ width: 36 }} />{/* spacer to keep brand centered */}
+      </div>
+
+      {/* ── Mobile drawer overlay ── */}
+      {mobileNav && (
+        <div className="mobile-overlay" onClick={() => setMobileNav(false)} />
+      )}
+      <aside className={`mobile-drawer ${mobileNav ? "open" : ""}`}>
+        <button className="drawer-close" onClick={() => setMobileNav(false)} aria-label="Close menu">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="4" y1="4" x2="16" y2="16"/><line x1="16" y1="4" x2="4" y2="16"/>
+          </svg>
+        </button>
+        <SideNav />
+      </aside>
 
       {/* ── Main ── */}
       <main className="main">

@@ -135,36 +135,19 @@ export default function YearSummary({ tx, others }) {
           <h2>Monthly Breakdown</h2>
           <span>{year}</span>
         </div>
-        <div className="tablewrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Month</th>
-                <th>Transactions</th>
-                <th style={{ textAlign: "right" }}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((x) => (
-                <tr key={x.key}>
-                  <td>{monthLabel(x.key)}</td>
-                  <td>{x.count}</td>
-                  <td className="amount">{money(x.total)}</td>
-                </tr>
-              ))}
-              <tr>
-                <td>
-                  <b>Year Total</b>
-                </td>
-                <td>
-                  <b>{yearTx.length}</b>
-                </td>
-                <td className="amount">
-                  <b>{money(total)}</b>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="month-breakdown-list">
+          {rows.map((x) => (
+            <div key={x.key} className={`month-breakdown-row${x.total === 0 ? " empty-month" : ""}`}>
+              <span className="mbl-month">{monthLabel(x.key, { month: "long" })}</span>
+              <span className="mbl-count">{x.count > 0 ? `${x.count} txn${x.count !== 1 ? "s" : ""}` : "—"}</span>
+              <span className="mbl-total">{x.total ? money(x.total) : "—"}</span>
+            </div>
+          ))}
+          <div className="month-breakdown-row total-row">
+            <span className="mbl-month">Year Total</span>
+            <span className="mbl-count">{yearTx.length} txns</span>
+            <span className="mbl-total">{money(total)}</span>
+          </div>
         </div>
       </div>
     </>

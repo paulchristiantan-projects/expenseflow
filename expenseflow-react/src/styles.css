@@ -47,6 +47,8 @@
 [data-theme="dark"] .bottom-nav        { background: var(--sidebar); border-color: var(--line); }
 [data-theme="dark"] .bottom-nav button { color: var(--muted); }
 [data-theme="dark"] .bottom-nav button.active { color: var(--accent); }
+[data-theme="dark"] .mobile-topbar     { background: var(--sidebar); border-color: var(--line); }
+[data-theme="dark"] .mobile-drawer     { background: var(--sidebar); border-color: var(--line); }
 
 /* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; }
@@ -120,36 +122,81 @@ body {
 .nav-sub .nav-icon { opacity: 0.7; }
 
 /* ══════════════════════════════════
-   BOTTOM NAV  (mobile only)
+   BOTTOM NAV  (mobile only) — removed, replaced by collapsible drawer
 ══════════════════════════════════ */
-.bottom-nav {
+.bottom-nav { display: none; }
+
+/* ══════════════════════════════════
+   MOBILE TOPBAR + DRAWER
+══════════════════════════════════ */
+.mobile-topbar {
   display: none;
   position: fixed;
-  bottom: 0; left: 0; right: 0;
-  height: var(--bottom-nav-h);
+  top: 0; left: 0; right: 0;
+  height: 54px;
   background: var(--sidebar);
-  border-top: 1px solid var(--line);
-  z-index: 200;
-  padding: 0 4px;
-  box-shadow: 0 -2px 12px rgba(45,106,45,.08);
-}
-.bottom-nav-inner {
-  display: flex;
-  height: 100%;
+  border-bottom: 1px solid var(--line);
+  z-index: 500;
+  padding: 0 12px;
   align-items: center;
-  justify-content: space-around;
+  justify-content: space-between;
+  box-shadow: var(--shadow);
 }
-.bottom-nav button {
-  background: none; border: none;
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  color: var(--muted); font-size: 10px; font-weight: 600;
-  padding: 6px 8px; border-radius: 10px;
-  cursor: pointer; flex: 1;
+/* Prevent tablet breakpoint brand styles from breaking the topbar layout */
+.mobile-topbar .brand {
+  padding: 0;
+  justify-content: center !important;
+  gap: 8px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.mobile-topbar .brand-name { display: flex !important; font-size: 15px; }
+.hamburger {
+  background: none; border: none; cursor: pointer;
+  color: var(--text); padding: 6px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s;
+}
+.hamburger:hover { background: var(--accent-bg); }
+
+.mobile-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 550;
+}
+.mobile-drawer {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: 260px;
+  background: var(--sidebar);
+  border-right: 1px solid var(--line);
+  box-shadow: var(--shadow-md);
+  z-index: 600;
+  padding: 20px 14px;
+  flex-direction: column;
+  overflow-y: auto;
+  transform: translateX(-100%);
+  transition: transform .25s ease;
+}
+.mobile-drawer.open { transform: translateX(0); }
+/* Force text labels visible inside drawer regardless of tablet breakpoint */
+.mobile-drawer .brand-name,
+.mobile-drawer .nav-section-label,
+.mobile-drawer .nav button span { display: inline !important; }
+.mobile-drawer .brand { padding-bottom: 20px; justify-content: flex-start; }
+.mobile-drawer .nav button { justify-content: flex-start; padding: 10px 12px; }
+.mobile-drawer .nav button .nav-icon { width: 20px; }
+.drawer-close {
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); padding: 4px; border-radius: 8px;
+  display: flex; align-items: center;
+  align-self: flex-end; margin-bottom: 12px;
   transition: color .15s;
-  min-width: 0;
 }
-.bottom-nav button.active { color: var(--accent); }
-.bottom-nav button svg    { flex-shrink: 0; }
+.drawer-close:hover { color: var(--text); }
 
 /* ══════════════════════════════════
    MAIN CONTENT
@@ -169,6 +216,7 @@ body {
   margin-bottom: 22px;
   gap: 14px;
   flex-wrap: wrap;
+  background: var(--bg);
 }
 .greeting { flex: 1; min-width: 0; }
 .greeting-sub {
@@ -234,7 +282,7 @@ select:focus, input:focus, textarea:focus { border-color: var(--accent-light); }
 .section-title h2 { font-size: 15px; font-weight: 700; margin: 0; }
 
 /* ── Bar chart ── */
-.bars { display: flex; align-items: flex-end; height: 175px; gap: 5px; border-bottom: 1px solid var(--line); padding: 8px 0 0; }
+.bars { display: flex; align-items: flex-end; height: 175px; gap: 5px; border-bottom: 1px solid var(--line); padding: 8px 0 0; overflow-x: auto; }
 .barwrap { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; min-width: 18px; }
 .bar { width: 65%; max-width: 30px; background: linear-gradient(180deg, var(--accent-light), var(--accent)); border-radius: 5px 5px 0 0; min-height: 2px; transition: height .3s; }
 .barlabel { font-size: 10px; color: var(--muted); margin-top: 5px; white-space: nowrap; }
@@ -274,6 +322,33 @@ td.col-action-cell{ text-align: center; padding: 8px; }
 
 /* ── Empty state ── */
 .empty { text-align: center; color: var(--muted); padding: 32px; font-size: 13px; }
+
+/* ── Transaction delete button ── */
+.tx-delete-btn {
+  background: none; border: none; color: var(--muted);
+  cursor: pointer; padding: 5px; border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: color .12s;
+}
+.tx-delete-btn:hover { color: var(--danger); }
+
+/* ── Mobile tx card list (hidden on desktop) ── */
+.tx-card-list { display: none; flex-direction: column; gap: 0; }
+.tx-card {
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.tx-card:last-child { border-bottom: none; }
+.tx-card-main {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+}
+.tx-card-desc { font-weight: 600; font-size: 14px; color: var(--text); flex: 1; }
+.tx-card-amount { font-weight: 800; font-size: 14px; color: var(--accent); white-space: nowrap; }
+.tx-card-meta {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.tx-card-date { font-size: 11px; color: var(--muted); }
 
 /* ── Modal ── */
 .modal {
@@ -368,6 +443,36 @@ td.col-action-cell{ text-align: center; padding: 8px; }
   .wallet-card-actions { opacity: 1; }
 }
 
+/* ── Monthly breakdown list (replaces table on all sizes) ── */
+.month-breakdown-list {
+  display: flex; flex-direction: column;
+}
+.month-breakdown-row {
+  padding: 11px 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+/* Plain div rows (YearSummary) — 3 cols */
+div.month-breakdown-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+}
+/* details rows (HouseExpenses) — summary handles its own grid */
+details.month-breakdown-row { display: block; }
+.month-breakdown-row summary::-webkit-details-marker { display: none; }
+details.month-breakdown-row[open] .mbl-month::after { content: " ▲"; font-size: 10px; color: var(--muted); }
+details.month-breakdown-row:not([open]) .mbl-month::after { content: " ▾"; font-size: 10px; color: var(--muted); }
+details.month-breakdown-row.empty-month:not([open]) .mbl-month::after { content: ""; }
+.month-breakdown-row:last-child { border-bottom: none; }
+.month-breakdown-row.empty-month { opacity: .45; }
+.month-breakdown-row.total-row { font-weight: 700; }
+.mbl-month { font-weight: 500; }
+.mbl-count { color: var(--muted); font-size: 12px; text-align: right; }
+.mbl-total { font-weight: 700; color: var(--accent); text-align: right; min-width: 90px; }
+.month-breakdown-row.total-row .mbl-total { color: var(--text); font-size: 14px; }
+
 /* ══════════════════════════════════
    RESPONSIVE BREAKPOINTS
 ══════════════════════════════════ */
@@ -388,16 +493,18 @@ td.col-action-cell{ text-align: center; padding: 8px; }
   .main           { padding: 20px 18px; }
 }
 
-/* Mobile: hide sidebar, show bottom nav */
+/* Mobile: hide sidebar, show hamburger + drawer */
 @media (max-width: 600px) {
   :root { --nav-w: 0px; }
   .side        { display: none; }
-  .bottom-nav  { display: block; }
+  .mobile-topbar { display: flex; }
+  .mobile-overlay { display: block; }
+  .mobile-drawer  { display: flex; }
   .main {
     margin-left: 0;
     width: 100%;
     padding: 16px 14px;
-    padding-bottom: calc(var(--bottom-nav-h) + 12px);
+    padding-top: calc(54px + 16px);
   }
   .grid         { grid-template-columns: 1fr 1fr; }
   .formgrid     { grid-template-columns: 1fr; }
@@ -412,6 +519,17 @@ td.col-action-cell{ text-align: center; padding: 8px; }
   .wallet-card  { min-height: 120px; padding: 14px; }
   .wallet-card-balance { font-size: 18px; }
   col.col-cat   { display: none; }
+
+  /* Transactions: switch to card layout */
+  .tx-table-desktop { display: none; }
+  .tx-card-list     { display: flex; }
+
+  /* Bar chart: compress on mobile */
+  .bars         { height: 120px; gap: 3px; overflow-x: hidden; }
+  .barwrap      { min-width: 0; }
+  .bar          { max-width: 20px; }
+  .barvalue     { font-size: 0; } /* hide value labels on mobile — too cramped */
+  .barlabel     { font-size: 9px; }
 }
 
 @media (max-width: 380px) {

@@ -757,42 +757,29 @@ export function HouseMonthlySummary({ allHouse, allGrocery = [], allTuition = []
           <h2>Monthly Breakdown</h2>
           <span>{resolvedYear}</span>
         </div>
-        <div className="tablewrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Month</th>
-                {HOUSE_CATEGORIES.map(({ key, icon }) => (
-                  <th key={key} style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                    <HouseCatIcon type={icon} size={12} /> {key}
-                  </th>
-                ))}
-                <th style={{ textAlign: "right" }}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.key} style={{ opacity: r.total === 0 ? 0.4 : 1 }}>
-                  <td style={{ whiteSpace: "nowrap" }}>{new Date(r.key + "-01").toLocaleString("en-US", { month: "long" })}</td>
-                  {HOUSE_CATEGORIES.map(({ key }) => (
-                    <td key={key} className="amount" style={{ color: r.bycat[key] ? "var(--text)" : "var(--muted)" }}>
-                      {r.bycat[key] ? money(r.bycat[key]) : "—"}
-                    </td>
-                  ))}
-                  <td className="amount" style={{ fontWeight: 600, color: r.total ? "var(--accent)" : "var(--muted)" }}>
-                    {r.total ? money(r.total) : "—"}
-                  </td>
-                </tr>
-              ))}
-              <tr>
-                <td><b>Year Total</b></td>
-                {HOUSE_CATEGORIES.map(({ key }) => (
-                  <td key={key} className="amount"><b>{catTotals[key] ? money(catTotals[key]) : "—"}</b></td>
-                ))}
-                <td className="amount"><b>{money(yearTotal)}</b></td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="month-breakdown-list">
+          {rows.map((r) => (
+            <details key={r.key} className={`month-breakdown-row${r.total === 0 ? " empty-month" : ""}`}>
+              <summary style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", cursor: r.total > 0 ? "pointer" : "default", listStyle: "none", gap: 8 }}>
+                <span className="mbl-month">{new Date(r.key + "-01").toLocaleString("en-US", { month: "long" })}</span>
+                <span className="mbl-total">{r.total ? money(r.total) : "—"}</span>
+              </summary>
+              {r.total > 0 && (
+                <div style={{ paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+                  {HOUSE_CATEGORIES.map(({ key }) => r.bycat[key] ? (
+                    <div key={key} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", padding: "2px 0" }}>
+                      <span>{key}</span>
+                      <span style={{ fontWeight: 600, color: "var(--text)" }}>{money(r.bycat[key])}</span>
+                    </div>
+                  ) : null)}
+                </div>
+              )}
+            </details>
+          ))}
+          <div className="month-breakdown-row total-row">
+            <span className="mbl-month">Year Total</span>
+            <span className="mbl-total">{money(yearTotal)}</span>
+          </div>
         </div>
       </div>
     </>

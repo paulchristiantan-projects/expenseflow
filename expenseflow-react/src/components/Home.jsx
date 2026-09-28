@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { money, monthLabel } from "../helpers";
 import { IconChevronRight } from "./Icons";
-import { HOUSE_CATEGORIES, effectiveHouseBycat } from "./HouseExpenses";
 
 function trend(current, prev) {
   if (!prev || prev === 0) return null;
@@ -82,16 +81,13 @@ function NavTile({ icon, title, sub, onClick }) {
 }
 
 export default function Home({
-  tx, others, house, grocery, tuition = [], otherExpense = [],
-  allTx, allOthers, allHouse, allGrocery, allTuition = [], allOtherExpense = [],
+  tx, others,
+  allTx, allOthers,
   month, wallets, onView, displayName, greeting, today, onMonthChange, months,
 }) {
   const personalTotal = useMemo(() =>
     tx.reduce((s, x) => s + x.amount, 0) + others.reduce((s, x) => s + x.amount, 0),
   [tx, others]);
-
-  const houseBycat = useMemo(() => effectiveHouseBycat(house, grocery, tuition, otherExpense), [house, grocery, tuition, otherExpense]);
-  const houseTotal = useMemo(() => Object.values(houseBycat).reduce((s, v) => s + v, 0), [houseBycat]);
 
   const lastMonth = useMemo(() => {
     const [y, m] = month.split("-").map(Number);
@@ -105,14 +101,6 @@ export default function Home({
     return l.reduce((s, x) => s + x.amount, 0) + lo.reduce((s, x) => s + x.amount, 0);
   }, [allTx, allOthers, lastMonth]);
 
-  const lastHouse = useMemo(() => {
-    const lh = (allHouse || []).filter((x) => x.month === lastMonth);
-    const lg = (allGrocery || []).filter((x) => x.month === lastMonth);
-    const lt = (allTuition || []).filter((x) => x.month === lastMonth);
-    const lo = (allOtherExpense || []).filter((x) => x.month === lastMonth);
-    return Object.values(effectiveHouseBycat(lh, lg, lt, lo)).reduce((s, v) => s + v, 0);
-  }, [allHouse, allGrocery, allTuition, allOtherExpense, lastMonth]);
-
   const topPersonalCat = useMemo(() => {
     const by = {};
     tx.forEach((x) => { by[x.cat] = (by[x.cat] || 0) + x.amount; });
@@ -120,13 +108,7 @@ export default function Home({
     return top ? { name: top[0], amount: top[1] } : null;
   }, [tx]);
 
-  const topHouseBill = useMemo(() =>
-    HOUSE_CATEGORIES.map(({ key }) => ({ key, amt: houseBycat[key] }))
-      .filter((x) => x.amt > 0).sort((a, b) => b.amt - a.amt)[0] || null,
-  [houseBycat]);
-
   const walletTotal = wallets.reduce((s, w) => s + w.balance, 0);
-  const hasHighlights = topPersonalCat || topHouseBill;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -152,11 +134,10 @@ export default function Home({
           onClick={() => onView("personal-dashboard")}
         />
         <SpendCard
-          label="House expenses"
-          amount={houseTotal}
-          prev={lastHouse}
-          sub={`${house.length} bill${house.length !== 1 ? "s" : ""} · ${grocery.length} grocery item${grocery.length !== 1 ? "s" : ""}`}
-          onClick={() => onView("house-dashboard")}
+          label="Shared expenses"
+          amount={0}
+          sub="Bills split across housemates"
+          onClick={() => onView("shared-house")}
         />
       </div>
 
@@ -164,26 +145,16 @@ export default function Home({
       <div className="two">
 
         {/* Top spends */}
-        {hasHighlights && (
+        {topPersonalCat && (
           <div className="card">
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>This month's highlights</div>
             <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 12 }}>{monthLabel(month, { month: "long", year: "numeric" })}</div>
-            {topPersonalCat && (
-              <HighlightRow
-                icon={<svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="6" r="3"/><path d="M3 16c0-3 2.7-5 6-5s6 2 6 5"/></svg>}
-                label="Top personal category"
-                name={topPersonalCat.name}
-                amount={topPersonalCat.amount}
-              />
-            )}
-            {topHouseBill && (
-              <HighlightRow
-                icon={<svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 7l7-5 7 5v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/><path d="M6 14V9h6v5"/></svg>}
-                label="Top house bill"
-                name={topHouseBill.key}
-                amount={topHouseBill.amt}
-              />
-            )}
+            <HighlightRow
+              icon={<svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="6" r="3"/><path d="M3 16c0-3 2.7-5 6-5s6 2 6 5"/></svg>}
+              label="Top personal category"
+              name={topPersonalCat.name}
+              amount={topPersonalCat.amount}
+            />
           </div>
         )}
 
@@ -221,12 +192,9 @@ export default function Home({
           Quick access
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
-          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M4 7h4M4 10h2"/></svg>} title="Personal Dashboard" sub="Charts & categories" onClick={() => onView("personal-dashboard")} />
-          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12V5l5-3 5 3v7"/><path d="M6 16V10h4v6"/><path d="M1 12h14"/></svg>} title="Personal Summary" sub="Month-by-month" onClick={() => onView("personal-summary")} />
-          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 7l7-5 7 5v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/><path d="M5.5 15V9h5v6"/></svg>} title="House Dashboard" sub="Bills & groceries" onClick={() => onView("house-dashboard")} />
-          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h12M2 8h8M2 12h5"/></svg>} title="House Summary" sub="Year overview" onClick={() => onView("house-summary")} />
-          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="14" height="9" rx="1.5"/><path d="M4 4V2.5A1.5 1.5 0 0 1 5.5 1h5A1.5 1.5 0 0 1 12 2.5V4"/><circle cx="8" cy="8.5" r="1.5"/></svg>} title="Budget" sub="Accounts & balances" onClick={() => onView("budget")} />
-          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v9M4 7l4 4 4-4"/><path d="M2 14h12"/></svg>} title="Bulk Import" sub="Personal transactions" onClick={() => onView("paste")} />
+          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M4 7h4M4 10h2"/></svg>} title="Personal" sub="Dashboard & transactions" onClick={() => onView("personal-dashboard")} />
+          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 7l7-5 7 5v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/><path d="M5.5 15V9h5v6"/></svg>} title="Shared House" sub="Split bills & expenses" onClick={() => onView("shared-house")} />
+          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 8a6 6 0 1 0 12 0A6 6 0 0 0 2 8z"/><path d="M8 5v3l2 1.5"/><path d="M2 3l2 1M12 3l-2 1"/></svg>} title="Travel" sub="Trips & group costs" onClick={() => onView("travel")} />
         </div>
       </div>
 
