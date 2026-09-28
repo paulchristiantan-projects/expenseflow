@@ -68,7 +68,13 @@ export default function Login({ auth }) {
             justifyContent: "center",
             fontSize: 28,
             marginBottom: 12,
-          }}>🌿</div>
+          }}>
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="var(--accent)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 3C8 3 4 8 4 14s4 11 10 11 10-5 10-11S20 3 14 3z"/>
+              <path d="M9 14c0-2.8 2.2-5 5-5s5 2.2 5 5-2.2 5-5 5"/>
+              <circle cx="14" cy="14" r="2" fill="var(--accent)" stroke="none"/>
+            </svg>
+          </div>
           <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>
             Expense<span style={{ color: "var(--accent)" }}>Flow</span>
           </div>

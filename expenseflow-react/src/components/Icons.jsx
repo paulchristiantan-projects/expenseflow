@@ -150,3 +150,11 @@ export function IconHouse({ size = 18 }) {
     </svg>
   );
 }
+
+export function IconTravel({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 12.5L7.5 9 5 4l1.5-.5 4 4.5 4-1.5a1.2 1.2 0 0 1 1.5 1.2 1.2 1.2 0 0 1-.9 1.1L11 10l-1 5-1.5.5-.5-4.5L2 12.5z" />
+    </svg>
+  );
+}

@@ -1,6 +1,8 @@
 import { useMemo, useState, useEffect } from "react";
 import { useStore } from "./useStore";
 import { useAuth } from "./useAuth";
+import { useSharedHouse, registerUserLookup } from "./useSharedHouse";
+import { useTravel, resolveTravelInvites } from "./useTravel";
 import { monthLabel } from "./helpers";
 import Home          from "./components/Home";
 import Dashboard    from "./components/Dashboard";
@@ -12,17 +14,17 @@ import AddModal     from "./components/AddModal";
 import Login        from "./components/Login";
 import Profile      from "./components/Profile";
 import HouseExpenses, { HouseBulkImport, HouseMonthlySummary } from "./components/HouseExpenses";
-import HouseDashboard from "./components/HouseDashboard";
+import HouseDashboard from "./components/HouseDashboard";import SharedHouse  from "./components/SharedHouse";
+import Travel        from "./components/Travel";
 import {
   IconHome, IconTransactions, IconYear,
-  IconImport, IconProfile, IconLogout, IconLeaf, IconPlus, IconBudget, IconHouse,
+  IconImport, IconProfile, IconLogout, IconLeaf, IconPlus, IconBudget, IconHouse, IconTravel,
 } from "./components/Icons";
 
 const NAV_BOTTOM = [
   { key: "dashboard",    label: "Home",    Icon: IconHome },
   { key: "budget",       label: "Budget",  Icon: IconBudget },
   { key: "transactions", label: "Txns",    Icon: IconTransactions },
-  { key: "house",        label: "House",   Icon: IconHouse },
   { key: "profile",      label: "Profile", Icon: IconProfile },
 ];
 
@@ -36,8 +38,26 @@ function getGreeting() {
 export default function App() {
   const auth  = useAuth();
   const { user, authLoading, logout } = auth;
-  const store = useStore(user?.uid);
-  const { tx, others, house, grocery, wallets, loading, error } = store;
+  const sharedHouseStore = useSharedHouse(user?.uid, user?.email);
+  const travelStore      = useTravel(user?.uid, user?.email);
+
+  // Register user lookup so invites-by-email resolve on next login
+  useEffect(() => {
+    if (user?.uid && user?.email) {
+      registerUserLookup(user.uid, user.email);
+      resolveTravelInvites(user.uid, user.email);
+    }
+  }, [user?.uid, user?.email]);
+
+  // Sync personal house writes to the selected shared house (owner only)
+  const syncTarget = useMemo(() => {
+    const h = sharedHouseStore.selectedHouse;
+    if (h && h.ownerUid === user?.uid) return { houseId: h.id, ownerUid: h.ownerUid };
+    return null;
+  }, [sharedHouseStore.selectedHouse, user?.uid]);
+
+  const store = useStore(user?.uid, syncTarget);
+  const { tx, others, house, grocery, tuition, otherExpense, wallets, loading, error } = store;
 
   const [view,      setView]      = useState("dashboard");
   const [month,     setMonth]     = useState("2026-08");
@@ -50,15 +70,17 @@ export default function App() {
   }, [theme]);
 
   const months = useMemo(() => {
-    const set = new Set([...tx, ...others, ...house].map((x) => x.month).filter(Boolean));
+    const set = new Set([...tx, ...others, ...house, ...tuition, ...otherExpense].map((x) => x.month).filter(Boolean));
     set.add(month);
     return [...set].sort().reverse();
   }, [tx, others, house, month]);
 
-  const monthTx     = useMemo(() => tx.filter((x)    => x.month === month), [tx,    month]);
-  const monthOthers = useMemo(() => others.filter((x) => x.month === month), [others, month]);
-  const monthHouse  = useMemo(() => house.filter((x)  => x.month === month), [house,  month]);
+  const monthTx      = useMemo(() => tx.filter((x)      => x.month === month), [tx,      month]);
+  const monthOthers  = useMemo(() => others.filter((x)  => x.month === month), [others,  month]);
+  const monthHouse   = useMemo(() => house.filter((x)   => x.month === month), [house,   month]);
   const monthGrocery = useMemo(() => grocery.filter((x) => x.month === month), [grocery, month]);
+  const monthTuition = useMemo(() => tuition.filter((x) => x.month === month), [tuition, month]);
+  const monthOtherExp= useMemo(() => otherExpense.filter((x) => x.month === month), [otherExpense, month]);
 
   if (error === "config") return (
     <div className="loading">
@@ -98,8 +120,8 @@ export default function App() {
   const displayName = user.displayName || user.email?.split("@")[0] || "there";
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   const hideTopBar = view === "profile" || view === "budget" || view === "dashboard"
-    || view === "house-import" || view === "house-summary" || view === "house-dashboard"
-    || view === "personal-dashboard" || view === "personal-summary";
+    || view === "personal-dashboard" || view === "personal-summary"
+    || view === "shared-house" || view === "travel";
 
   // Personal views that activate "Personal" parent
   const personalViews = ["personal-dashboard", "personal-summary", "transactions", "paste"];
@@ -146,22 +168,26 @@ export default function App() {
             <span>Bulk Import</span>
           </button>
 
-          {/* House */}
-          <button className={["house-dashboard","house-import","house-summary"].includes(view) ? "active" : ""} onClick={() => setView("house-dashboard")}>
+          {/* Shared House */}
+          <button className={view === "shared-house" ? "active" : ""} onClick={() => setView("shared-house")}>
             <span className="nav-icon"><IconHouse /></span>
-            <span>House</span>
+            <span>Shared House</span>
+            {sharedHouseStore.sharedHouses.length > 0 && (
+              <span style={{ marginLeft: "auto", background: "var(--accent)", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px", fontWeight: 700 }}>
+                {sharedHouseStore.sharedHouses.length}
+              </span>
+            )}
           </button>
-          <button className={`nav-sub ${view === "house-dashboard" ? "active" : ""}`} onClick={() => setView("house-dashboard")}>
-            <span className="nav-icon"><IconHome /></span>
-            <span>Dashboard</span>
-          </button>
-          <button className={`nav-sub ${view === "house-summary" ? "active" : ""}`} onClick={() => setView("house-summary")}>
-            <span className="nav-icon"><IconYear /></span>
-            <span>Monthly Summary</span>
-          </button>
-          <button className={`nav-sub ${view === "house-import" ? "active" : ""}`} onClick={() => setView("house-import")}>
-            <span className="nav-icon"><IconImport /></span>
-            <span>Bulk Import</span>
+
+          {/* Travel */}
+          <button className={view === "travel" ? "active" : ""} onClick={() => setView("travel")}>
+            <span className="nav-icon"><IconTravel /></span>
+            <span>Travel</span>
+            {travelStore.trips.length > 0 && (
+              <span style={{ marginLeft: "auto", background: "var(--accent)", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px", fontWeight: 700 }}>
+                {travelStore.trips.length}
+              </span>
+            )}
           </button>
 
           <hr className="nav-divider" />
@@ -214,7 +240,7 @@ export default function App() {
 
         {error && error !== "config" && <div className="banner">Firestore error: {error}</div>}
 
-        {view === "dashboard"    && <Home tx={monthTx} others={monthOthers} house={monthHouse} grocery={monthGrocery} allTx={tx} allOthers={others} allHouse={house} allGrocery={grocery} month={month} wallets={wallets} onView={setView} displayName={displayName} greeting={getGreeting()} today={today} onMonthChange={setMonth} months={months} />}
+        {view === "dashboard"    && <Home tx={monthTx} others={monthOthers} house={monthHouse} grocery={monthGrocery} tuition={monthTuition} otherExpense={monthOtherExp} allTx={tx} allOthers={others} allHouse={house} allGrocery={grocery} allTuition={tuition} allOtherExpense={otherExpense} month={month} wallets={wallets} onView={setView} displayName={displayName} greeting={getGreeting()} today={today} onMonthChange={setMonth} months={months} />}
         {view === "budget"       && <Budget wallets={wallets} onAdd={store.addWallet} onUpdate={store.updateWallet} onDelete={store.delWallet} />}
         {view === "transactions" && <Transactions tx={monthTx} onDelete={store.delTx} others={monthOthers} onAddOther={handleAddOther} onDeleteOther={store.delOther} />}
         {view === "paste"        && <BulkImport onImport={handleImport} />}
@@ -254,59 +280,30 @@ export default function App() {
           </div>
         )}
 
-        {/* ── House views ── */}
-        {view === "house-dashboard" && (
-          <div>
-            <div className="top" style={{ marginBottom: 0 }}>
-              <div className="greeting">
-                <div className="greeting-sub">{today}</div>
-                <h1>House — Dashboard</h1>
-              </div>
-              <div className="top-actions">
-                <select className="month-pill" value={month} onChange={(e) => setMonth(e.target.value)}>
-                  {months.map((k) => <option key={k} value={k}>{monthLabel(k)}</option>)}
-                </select>
-              </div>
-            </div>
-            <HouseDashboard
-              house={monthHouse}
-              grocery={monthGrocery}
-              month={month}
-              onView={setView}
-              onAdd={(d) => store.addHouse(d)}
-              onUpdate={(id, fields) => store.updateHouse(id, fields)}
-              onDelete={store.delHouse}
-              onAddGrocery={store.addGrocery}
-              onDelGrocery={store.delGrocery}
-            />
-          </div>
-        )}
-        {view === "house-import"  && (
-          <div>
-            <div className="top" style={{ marginBottom: 0 }}>
-              <div className="greeting">
-                <div className="greeting-sub">{today}</div>
-                <h1>House — Bulk Import</h1>
-              </div>
-            </div>
-            <div className="card" style={{ marginTop: 0 }}>
-              <HouseBulkImport
-                onImport={store.importManyHouse}
-                onImportGrocery={store.importManyGrocery}
-              />
-            </div>
-          </div>
+        {/* ── Shared House ── */}
+        {view === "shared-house" && (
+          <SharedHouse
+            sharedHouseStore={sharedHouseStore}
+            month={month}
+            onMonthChange={setMonth}
+            months={months}
+            userEmail={user.email}
+            today={today}
+            personalHouse={house}
+            personalGrocery={grocery}
+          />
         )}
 
-        {view === "house-summary"  && (
+        {/* ── Travel ── */}
+        {view === "travel" && (
           <div>
             <div className="top" style={{ marginBottom: 0 }}>
               <div className="greeting">
                 <div className="greeting-sub">{today}</div>
-                <h1>House — Monthly Summary</h1>
+                <h1>Travel</h1>
               </div>
             </div>
-            <HouseMonthlySummary allHouse={house} allGrocery={grocery} />
+            <Travel travelStore={travelStore} userEmail={user.email} />
           </div>
         )}
       </main>

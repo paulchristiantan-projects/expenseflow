@@ -61,7 +61,7 @@ function HighlightRow({ icon, label, name, amount }) {
   );
 }
 
-function NavTile({ emoji, title, sub, onClick }) {
+function NavTile({ icon, title, sub, onClick }) {
   return (
     <button onClick={onClick} style={{
       display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
@@ -71,7 +71,7 @@ function NavTile({ emoji, title, sub, onClick }) {
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.background = "var(--accent-bg)"; }}
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--line)"; e.currentTarget.style.background = "var(--card)"; }}
     >
-      <span style={{ fontSize: 20 }}>{emoji}</span>
+      <span style={{ width: 32, height: 32, borderRadius: 8, background: "var(--accent-bg)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "var(--accent)" }}>{icon}</span>
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)" }}>{title}</div>
         <div style={{ fontSize: 11, color: "var(--muted)" }}>{sub}</div>
@@ -82,15 +82,15 @@ function NavTile({ emoji, title, sub, onClick }) {
 }
 
 export default function Home({
-  tx, others, house, grocery,
-  allTx, allOthers, allHouse, allGrocery,
+  tx, others, house, grocery, tuition = [], otherExpense = [],
+  allTx, allOthers, allHouse, allGrocery, allTuition = [], allOtherExpense = [],
   month, wallets, onView, displayName, greeting, today, onMonthChange, months,
 }) {
   const personalTotal = useMemo(() =>
     tx.reduce((s, x) => s + x.amount, 0) + others.reduce((s, x) => s + x.amount, 0),
   [tx, others]);
 
-  const houseBycat = useMemo(() => effectiveHouseBycat(house, grocery), [house, grocery]);
+  const houseBycat = useMemo(() => effectiveHouseBycat(house, grocery, tuition, otherExpense), [house, grocery, tuition, otherExpense]);
   const houseTotal = useMemo(() => Object.values(houseBycat).reduce((s, v) => s + v, 0), [houseBycat]);
 
   const lastMonth = useMemo(() => {
@@ -108,8 +108,10 @@ export default function Home({
   const lastHouse = useMemo(() => {
     const lh = (allHouse || []).filter((x) => x.month === lastMonth);
     const lg = (allGrocery || []).filter((x) => x.month === lastMonth);
-    return Object.values(effectiveHouseBycat(lh, lg)).reduce((s, v) => s + v, 0);
-  }, [allHouse, allGrocery, lastMonth]);
+    const lt = (allTuition || []).filter((x) => x.month === lastMonth);
+    const lo = (allOtherExpense || []).filter((x) => x.month === lastMonth);
+    return Object.values(effectiveHouseBycat(lh, lg, lt, lo)).reduce((s, v) => s + v, 0);
+  }, [allHouse, allGrocery, allTuition, allOtherExpense, lastMonth]);
 
   const topPersonalCat = useMemo(() => {
     const by = {};
@@ -219,12 +221,12 @@ export default function Home({
           Quick access
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
-          <NavTile emoji="📊" title="Personal Dashboard" sub="Charts & categories" onClick={() => onView("personal-dashboard")} />
-          <NavTile emoji="📅" title="Personal Summary" sub="Month-by-month" onClick={() => onView("personal-summary")} />
-          <NavTile emoji="🏠" title="House Dashboard" sub="Bills & groceries" onClick={() => onView("house-dashboard")} />
-          <NavTile emoji="📋" title="House Summary" sub="Year overview" onClick={() => onView("house-summary")} />
-          <NavTile emoji="💳" title="Budget" sub="Accounts & balances" onClick={() => onView("budget")} />
-          <NavTile emoji="📥" title="Bulk Import" sub="Personal transactions" onClick={() => onView("paste")} />
+          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M4 7h4M4 10h2"/></svg>} title="Personal Dashboard" sub="Charts & categories" onClick={() => onView("personal-dashboard")} />
+          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12V5l5-3 5 3v7"/><path d="M6 16V10h4v6"/><path d="M1 12h14"/></svg>} title="Personal Summary" sub="Month-by-month" onClick={() => onView("personal-summary")} />
+          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 7l7-5 7 5v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/><path d="M5.5 15V9h5v6"/></svg>} title="House Dashboard" sub="Bills & groceries" onClick={() => onView("house-dashboard")} />
+          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4h12M2 8h8M2 12h5"/></svg>} title="House Summary" sub="Year overview" onClick={() => onView("house-summary")} />
+          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="14" height="9" rx="1.5"/><path d="M4 4V2.5A1.5 1.5 0 0 1 5.5 1h5A1.5 1.5 0 0 1 12 2.5V4"/><circle cx="8" cy="8.5" r="1.5"/></svg>} title="Budget" sub="Accounts & balances" onClick={() => onView("budget")} />
+          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v9M4 7l4 4 4-4"/><path d="M2 14h12"/></svg>} title="Bulk Import" sub="Personal transactions" onClick={() => onView("paste")} />
         </div>
       </div>
 

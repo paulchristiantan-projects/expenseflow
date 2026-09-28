@@ -26,14 +26,14 @@ export function byDateDesc(rows) {
 }
 
 export const CATEGORIES = [
-  "Food & Dining",
-  "House Payment",
-  "Transport",
-  "Shopping",
-  "Lodging",
   "Bills",
+  "Food & Dining",
   "Gadgets",
-  "Subscription",
-  "Savings",
+  "House Payment",
+  "Lodging",
   "Other",
+  "Savings",
+  "Shopping",
+  "Subscription",
+  "Transport",
 ];

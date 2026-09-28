@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { money, monthLabel } from "../helpers";
-import { HOUSE_CATEGORIES, GROCERY_SUBCATS, HouseCatIcon, USAGE_CONFIG, effectiveHouseBycat } from "./HouseExpenses";
+import { HOUSE_CATEGORIES, GROCERY_SUBCATS, HouseCatIcon, USAGE_CONFIG, effectiveHouseBycat, HOUSE_CAT_COLORS, normalizeCat } from "./HouseExpenses";
 import { IconTrash, IconEdit, IconPlus } from "./Icons";
 
 // Entry modal
@@ -54,11 +54,7 @@ function EntryModal({ initial, month, onSave, onClose }) {
   );
 }
 
-const CAT_COLORS = [
-  "#4a5adf", "#7c8cff", "#a0acff", "#c7ccf8",
-  "#2563eb", "#3b82f6", "#60a5fa", "#93c5fd",
-  "#6366f1", "#818cf8", "#e67e22", "#c0392b",
-];
+const CAT_COLORS = []; // kept for compatibility, use HOUSE_CAT_COLORS instead
 
 function KpiIcon({ children }) {
   return (
@@ -96,16 +92,16 @@ function DonutChart({ segments }) {
   );
 }
 
-export default function HouseDashboard({ house, grocery, month, onView, onAdd, onUpdate, onDelete, onAddGrocery, onDelGrocery }) {
+export default function HouseDashboard({ house, grocery, tuition = [], otherExpense = [], month, onView, onAdd, onUpdate, onDelete, onAddGrocery, onDelGrocery, onAddTuition, onDelTuition, onAddOther, onDelOther, readOnly = false }) {
   const [modal, setModal] = useState(null); // null | "add" | { ...entry }
 
   async function handleSave(data) {
-    if (modal?.id) await onUpdate(modal.id, { cat: data.category, amount: data.amount, note: data.note, usage: data.usage ?? null, month: data.month });
+    if (modal?.id) await onUpdate(modal.id, { cat: data.category, amount: data.amount, note: data.note, usage: data.usage ?? null, month: data.month, sharedDocId: modal.sharedDocId });
     else await onAdd(data);
     setModal(null);
   }
   // Bills totals by category — Groceries/Market overridden by grocery items when present
-  const bycat = useMemo(() => effectiveHouseBycat(house, grocery), [house, grocery]);
+  const bycat = useMemo(() => effectiveHouseBycat(house, grocery, tuition, otherExpense), [house, grocery, tuition, otherExpense]);
 
   const houseTotal = useMemo(() => Object.values(bycat).reduce((s, v) => s + v, 0), [bycat]);
   const groceryTotal = grocery.reduce((s, x) => s + x.amount, 0);
@@ -114,7 +110,7 @@ export default function HouseDashboard({ house, grocery, month, onView, onAdd, o
   // For donut — non-zero categories
   const donutSegments = HOUSE_CATEGORIES
     .filter(({ key }) => bycat[key] > 0)
-    .map(({ key }, i) => ({ value: bycat[key], color: CAT_COLORS[i % CAT_COLORS.length], label: key }));
+    .map(({ key }) => ({ value: bycat[key], color: HOUSE_CAT_COLORS[key], label: key }));
 
   // Grocery by subcat
   const groceryBySubcat = useMemo(() =>
@@ -159,8 +155,8 @@ export default function HouseDashboard({ house, grocery, month, onView, onAdd, o
               <circle cx="11.5" cy="13.5" r="1.5"/>
             </svg>
           </KpiIcon>
-          <div className="label">Groceries</div>
-          <div className="value">{money(bycat["Groceries/Market"])}</div>
+          <div className="label">Food & Essentials</div>
+          <div className="value">{money(bycat["Food & Essentials"])}</div>
           <small>{grocery.length > 0 ? `${grocery.length} items` : "from bills"}</small>
         </div>
 
@@ -185,18 +181,27 @@ export default function HouseDashboard({ house, grocery, month, onView, onAdd, o
             <span className="badge">{monthLabel(month, { month: "short", year: "numeric" })}</span>
           </div>
           {houseTotal > 0 ? (
-            <div className="cat" style={{ marginTop: 8 }}>
-              {HOUSE_CATEGORIES.map(({ key, icon }) => (
-                <div className="catrow" key={key}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <HouseCatIcon type={icon} size={14} /> {key}
-                  </span>
-                  <div className="track">
-                    <div className="fill" style={{ width: `${(bycat[key] / maxCat) * 100}%` }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+              {HOUSE_CATEGORIES.map(({ key, icon }) => {
+                const amt   = bycat[key] || 0;
+                const pct   = amt ? Math.max(4, Math.round((amt / maxCat) * 100)) : 0;
+                const color = HOUSE_CAT_COLORS[key];
+                return (
+                  <div key={key}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--muted)" }}>
+                        <HouseCatIcon type={icon} size={13} /> {key}
+                      </span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: amt ? "var(--text)" : "var(--muted)" }}>
+                        {amt ? money(amt) : "—"}
+                      </span>
+                    </div>
+                    <div style={{ height: 10, borderRadius: 6, background: "var(--line)", overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 6, transition: "width .3s ease" }} />
+                    </div>
                   </div>
-                  <span className="catamt">{bycat[key] > 0 ? money(bycat[key]) : "—"}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="empty">No bills data for this month.</div>
@@ -231,7 +236,7 @@ export default function HouseDashboard({ house, grocery, month, onView, onAdd, o
       {groceryTotal > 0 && (
         <div className="card">
           <div className="section-header" style={{ marginBottom: 14 }}>
-            <h2>🛒 Grocery breakdown</h2>
+            <h2>Food & Essentials breakdown</h2>
             <span style={{ fontWeight: 700, color: "var(--accent)" }}>{money(groceryTotal)}</span>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
@@ -258,12 +263,12 @@ export default function HouseDashboard({ house, grocery, month, onView, onAdd, o
       <div className="card">
         <div className="section-header">
           <h2>House Bills — {monthLabel(month, { month: "long", year: "numeric" })}</h2>
-          <button className="btn primary" onClick={() => setModal("add")}><IconPlus size={14}/> Add</button>
+          {!readOnly && <button className="btn primary" onClick={() => setModal("add")}><IconPlus size={14}/> Add</button>}
         </div>
         {/* Category chips */}
         <div style={{ display:"flex", flexWrap:"wrap", gap:8, margin:"14px 0 10px" }}>
           {HOUSE_CATEGORIES.map(({ key, icon }) => {
-            const amt = house.filter((x) => x.cat===key).reduce((s,x)=>s+x.amount,0);
+            const amt = house.filter((x) => normalizeCat(x.cat)===key).reduce((s,x)=>s+x.amount,0);
             return (
               <div key={key} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", borderRadius:20,
                 background: amt?"var(--accent-bg)":"var(--bg)", border:`1px solid ${amt?"var(--accent-soft)":"var(--line)"}`,
@@ -278,31 +283,32 @@ export default function HouseDashboard({ house, grocery, month, onView, onAdd, o
         {house.length ? (
           <div className="tablewrap" style={{ marginTop:8 }}>
             <table>
-              <colgroup><col style={{ width:36 }}/><col/><col style={{ width:110 }}/><col/><col style={{ width:130 }}/><col style={{ width:48 }}/><col style={{ width:48 }}/></colgroup>
-              <thead><tr><th></th><th>Category</th><th style={{ textAlign:"right" }}>Usage</th><th>Note</th><th style={{ textAlign:"right" }}>Amount</th><th></th><th></th></tr></thead>
+              <colgroup><col style={{ width:36 }}/><col/><col style={{ width:110 }}/><col/><col style={{ width:130 }}/>{!readOnly && <col style={{ width:48 }}/>}{!readOnly && <col style={{ width:48 }}/>}</colgroup>
+              <thead><tr><th></th><th>Category</th><th style={{ textAlign:"right" }}>Usage</th><th>Note</th><th style={{ textAlign:"right" }}>Amount</th>{!readOnly && <th></th>}{!readOnly && <th></th>}</tr></thead>
               <tbody>
                 {house.map((x) => {
-                  const meta = HOUSE_CATEGORIES.find((c) => c.key===x.cat)||{};
-                  const uc = USAGE_CONFIG[x.cat];
+                  const displayCat = normalizeCat(x.cat);
+                  const meta = HOUSE_CATEGORIES.find((c) => c.key===displayCat)||{};
+                  const uc = USAGE_CONFIG[displayCat];
                   return (
                     <tr key={x.id}>
                       <td style={{ textAlign:"center", paddingTop:2 }}><HouseCatIcon type={meta.icon} size={18}/></td>
-                      <td style={{ fontWeight:500 }}>{x.cat}</td>
+                      <td style={{ fontWeight:500 }}>{displayCat}</td>
                       <td style={{ textAlign:"right", color:"var(--muted)", fontSize:13 }}>
                         {uc && x.usage != null ? <span>{x.usage.toLocaleString()} <span style={{ fontSize:11 }}>{uc.unit}</span></span> : uc ? "—" : ""}
                       </td>
                       <td style={{ color:"var(--muted)", fontSize:13 }}>{x.note||"—"}</td>
                       <td className="amount">{money(x.amount)}</td>
-                      <td className="col-action-cell">
+                      {!readOnly && <td className="col-action-cell">
                         <button style={{ background:"none", border:"none", color:"var(--muted)", cursor:"pointer", padding:5, borderRadius:6, display:"inline-flex" }}
                           onMouseEnter={(e)=>e.currentTarget.style.color="var(--accent)"} onMouseLeave={(e)=>e.currentTarget.style.color="var(--muted)"}
                           onClick={() => setModal(x)}><IconEdit size={14}/></button>
-                      </td>
-                      <td className="col-action-cell">
+                      </td>}
+                      {!readOnly && <td className="col-action-cell">
                         <button style={{ background:"none", border:"none", color:"var(--muted)", cursor:"pointer", padding:5, borderRadius:6, display:"inline-flex" }}
                           onMouseEnter={(e)=>e.currentTarget.style.color="var(--danger)"} onMouseLeave={(e)=>e.currentTarget.style.color="var(--muted)"}
-                          onClick={() => { if(confirm(`Delete this ${x.cat} entry?`)) onDelete(x.id); }}><IconTrash/></button>
-                      </td>
+                          onClick={() => { if(confirm(`Delete this ${displayCat} entry?`)) onDelete(x.id, x.sharedDocId); }}><IconTrash/></button>
+                      </td>}
                     </tr>
                   );
                 })}
@@ -320,7 +326,7 @@ export default function HouseDashboard({ house, grocery, month, onView, onAdd, o
       {grocery.length > 0 && (
         <div className="card">
           <div className="section-header" style={{ marginBottom:14 }}>
-            <h2>🛒 Grocery Breakdown</h2>
+            <h2>Food & Essentials</h2>
             <span style={{ fontWeight:700, color:"var(--accent)", fontSize:15 }}>{money(groceryTotal)}</span>
           </div>
           <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
@@ -341,16 +347,90 @@ export default function HouseDashboard({ house, grocery, month, onView, onAdd, o
                           <tr key={x.id}>
                             <td style={{ color:"var(--muted)", fontSize:13 }}>{x.desc}</td>
                             <td className="amount">{money(x.amount)}</td>
-                            <td className="col-action-cell">
+                            {!readOnly && <td className="col-action-cell">
                               <button style={{ background:"none", border:"none", color:"var(--muted)", cursor:"pointer", padding:5, borderRadius:6, display:"inline-flex" }}
                                 onMouseEnter={(e)=>e.currentTarget.style.color="var(--danger)"} onMouseLeave={(e)=>e.currentTarget.style.color="var(--muted)"}
-                                onClick={() => { if(confirm(`Delete "${x.desc}"?`)) onDelGrocery(x.id); }}><IconTrash/></button>
-                            </td>
+                                onClick={() => { if(confirm(`Delete "${x.desc}"?`)) onDelGrocery(x.id, x.sharedDocId); }}><IconTrash/></button>
+                            </td>}
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── School Fees breakdown ── */}
+      {tuition.length > 0 && (
+        <div className="card">
+          <div className="section-header" style={{ marginBottom:14 }}>
+            <h2>School Fees</h2>
+            <span style={{ fontWeight:700, color:"var(--accent)", fontSize:15 }}>{money(tuition.reduce((s,x)=>s+x.amount,0))}</span>
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            {[...new Set(tuition.map((x)=>x.subcat))].map((sub) => {
+              const items = tuition.filter((x)=>x.subcat===sub);
+              const subTotal = items.reduce((s,x)=>s+x.amount,0);
+              return (
+                <div key={sub}>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+                    <span style={{ fontWeight:600, fontSize:13 }}>{sub}</span>
+                    <span style={{ fontWeight:700, fontSize:13, color:"var(--accent)" }}>{money(subTotal)}</span>
+                  </div>
+                  <div className="tablewrap"><table><tbody>
+                    {items.map((x) => (
+                      <tr key={x.id}>
+                        <td style={{ color:"var(--muted)", fontSize:13 }}>{x.desc}</td>
+                        <td className="amount">{money(x.amount)}</td>
+                        {!readOnly && <td className="col-action-cell">
+                          <button style={{ background:"none", border:"none", color:"var(--muted)", cursor:"pointer", padding:5, borderRadius:6, display:"inline-flex" }}
+                            onMouseEnter={(e)=>e.currentTarget.style.color="var(--danger)"} onMouseLeave={(e)=>e.currentTarget.style.color="var(--muted)"}
+                            onClick={() => { if(confirm(`Delete "${x.desc}"?`)) onDelTuition(x.id, x.sharedDocId); }}><IconTrash/></button>
+                        </td>}
+                      </tr>
+                    ))}
+                  </tbody></table></div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Other Expense breakdown ── */}
+      {otherExpense.length > 0 && (
+        <div className="card">
+          <div className="section-header" style={{ marginBottom:14 }}>
+            <h2>Other Expenses</h2>
+            <span style={{ fontWeight:700, color:"var(--accent)", fontSize:15 }}>{money(otherExpense.reduce((s,x)=>s+x.amount,0))}</span>
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            {[...new Set(otherExpense.map((x)=>x.subcat))].map((sub) => {
+              const items = otherExpense.filter((x)=>x.subcat===sub);
+              const subTotal = items.reduce((s,x)=>s+x.amount,0);
+              return (
+                <div key={sub}>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+                    <span style={{ fontWeight:600, fontSize:13 }}>{sub}</span>
+                    <span style={{ fontWeight:700, fontSize:13, color:"var(--accent)" }}>{money(subTotal)}</span>
+                  </div>
+                  <div className="tablewrap"><table><tbody>
+                    {items.map((x) => (
+                      <tr key={x.id}>
+                        <td style={{ color:"var(--muted)", fontSize:13 }}>{x.desc}</td>
+                        <td className="amount">{money(x.amount)}</td>
+                        {!readOnly && <td className="col-action-cell">
+                          <button style={{ background:"none", border:"none", color:"var(--muted)", cursor:"pointer", padding:5, borderRadius:6, display:"inline-flex" }}
+                            onMouseEnter={(e)=>e.currentTarget.style.color="var(--danger)"} onMouseLeave={(e)=>e.currentTarget.style.color="var(--muted)"}
+                            onClick={() => { if(confirm(`Delete "${x.desc}"?`)) onDelOther(x.id, x.sharedDocId); }}><IconTrash/></button>
+                        </td>}
+                      </tr>
+                    ))}
+                  </tbody></table></div>
                 </div>
               );
             })}
@@ -364,7 +444,7 @@ export default function HouseDashboard({ house, grocery, month, onView, onAdd, o
         </button>
       </div>
 
-      {modal && (
+      {modal && !readOnly && (
         <EntryModal
           initial={modal === "add" ? null : modal}
           month={month}

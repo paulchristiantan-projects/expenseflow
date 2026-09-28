@@ -4,13 +4,27 @@ import { IconTrash, IconEdit, IconPlus } from "./Icons";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 export const HOUSE_CATEGORIES = [
-  { key: "Electricity",      icon: "electricity" },
-  { key: "Water",            icon: "water"        },
-  { key: "Internet",         icon: "internet"     },
-  { key: "House Payment",    icon: "house"        },
-  { key: "Association Dues", icon: "dues"         },
-  { key: "Groceries/Market", icon: "grocery"      },
+  { key: "Association Dues",  icon: "dues"        },
+  { key: "Electricity",       icon: "electricity" },
+  { key: "Food & Essentials", icon: "grocery"     },
+  { key: "House Payment",     icon: "house"       },
+  { key: "Internet",          icon: "internet"    },
+  { key: "Other Expense",     icon: "other"       },
+  { key: "School Fees",       icon: "tuition"     },
+  { key: "Water",             icon: "water"       },
 ];
+
+// Canonical color per category — shared by dashboard, charts, donut
+export const HOUSE_CAT_COLORS = {
+  "Electricity":      "#4a5adf",
+  "Water":            "#60a5fa",
+  "Internet":         "#a78bfa",
+  "House Payment":    "#f59e0b",
+  "Association Dues": "#10b981",
+  "Food & Essentials": "#f97316",
+  "School Fees":      "#ec4899",
+  "Other Expense":    "#94a3b8",
+};
 
 export function HouseCatIcon({ type, size = 16 }) {
   const s = { width: size, height: size, display: "inline-block", flexShrink: 0 };
@@ -18,7 +32,7 @@ export function HouseCatIcon({ type, size = 16 }) {
   switch (type) {
     case "electricity": return (
       <svg style={s} viewBox="0 0 16 16" {...p}>
-        <path d="M9 1L4 9h5l-2 6 7-8H9z" fill="var(--accent-bg)" stroke="var(--accent)"/>
+        <path d="M9 1L4 9h5l-2 6 7-8H9z" fill="var(--accent-bg)"/>
       </svg>
     );
     case "water": return (
@@ -40,16 +54,30 @@ export function HouseCatIcon({ type, size = 16 }) {
     );
     case "dues": return (
       <svg style={s} viewBox="0 0 16 16" {...p}>
-        <rect x="1" y="5" width="14" height="9" rx="1.5" fill="var(--accent-bg)"/>
+        <rect x="1" y="5" width="14" height="9" rx="1.5" fill="var(--accent-bg)" stroke="var(--accent)"/>
         <path d="M4 5V3.5A2.5 2.5 0 0 1 6.5 1h3A2.5 2.5 0 0 1 12 3.5V5"/>
         <circle cx="8" cy="9.5" r="1.5" fill="var(--accent)" stroke="none"/>
       </svg>
     );
     case "grocery": return (
+      <svg style={s} viewBox="0 0 16 16" fill="none" stroke="var(--accent)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 2h1.5l2 7h7l1.5-5H5" fill="var(--accent-bg)" stroke="var(--accent)"/>
+        <circle cx="6.5" cy="12.5" r="1.2" fill="var(--accent)" stroke="none"/>
+        <circle cx="11" cy="12.5" r="1.2" fill="var(--accent)" stroke="none"/>
+      </svg>
+    );
+    case "tuition": return (
       <svg style={s} viewBox="0 0 16 16" {...p}>
-        <path d="M2 2h1.5l2 7h7l1.5-5H5" fill="var(--accent-bg)"/>
-        <circle cx="6.5" cy="12.5" r="1" fill="var(--accent)" stroke="none"/>
-        <circle cx="11" cy="12.5" r="1" fill="var(--accent)" stroke="none"/>
+        <path d="M8 1L1 5l7 4 7-4-7-4z" fill="var(--accent-bg)"/>
+        <path d="M4 6.5v4a4 4 0 0 0 8 0v-4"/>
+        <line x1="1" y1="5" x2="1" y2="10"/>
+      </svg>
+    );
+    case "other": return (
+      <svg style={s} viewBox="0 0 16 16" {...p}>
+        <circle cx="8" cy="8" r="6" fill="var(--accent-bg)" stroke="var(--accent)"/>
+        <line x1="8" y1="5" x2="8" y2="8"/>
+        <circle cx="8" cy="11" r="0.75" fill="var(--accent)" stroke="none"/>
       </svg>
     );
     default: return null;
@@ -57,6 +85,10 @@ export function HouseCatIcon({ type, size = 16 }) {
 }
 
 export const GROCERY_SUBCATS = ["Food", "Mineral", "Others", "Dad", "Precious Allowance"];
+
+export const TUITION_SUBCATS = ["Tuition Fee", "Allowance", "Project", "Books/Supplies", "Uniform", "Others"];
+
+export const OTHER_EXPENSE_SUBCATS = ["Aircon Cleaning", "House Repair", "Appliance Repair", "Medical", "Transportation", "Others"];
 
 export const USAGE_CONFIG = {
   "Electricity": { label: "kWh used",     placeholder: "e.g. 312.5", unit: "kWh" },
@@ -68,11 +100,21 @@ export const USAGE_CONFIG = {
  * with the sum of grocery items when any items exist for that month.
  * allHouse: all house bill entries, allGrocery: all grocery items, month: "YYYY-MM"
  */
-export function effectiveHouseBycat(houseEntries, groceryEntries) {
+export function effectiveHouseBycat(houseEntries, groceryEntries, tuitionEntries = [], otherEntries = []) {
   const bycat = Object.fromEntries(HOUSE_CATEGORIES.map(({ key }) => [key, 0]));
-  houseEntries.forEach((x) => { if (bycat[x.cat] !== undefined) bycat[x.cat] += x.amount; });
-  const groceryTotal = groceryEntries.reduce((s, x) => s + x.amount, 0);
-  if (groceryEntries.length > 0) bycat["Groceries/Market"] = groceryTotal;
+  houseEntries.forEach((x) => {
+    // Map old key to new key for backwards compatibility
+    const cat = x.cat === "Groceries/Market" ? "Food & Essentials"
+              : x.cat === "Tuition"          ? "School Fees"
+              : x.cat;
+    if (bycat[cat] !== undefined) bycat[cat] += x.amount;
+  });
+  const groceryTotal  = groceryEntries.reduce((s, x) => s + x.amount, 0);
+  const tuitionTotal  = tuitionEntries.reduce((s, x) => s + x.amount, 0);
+  const otherTotal    = otherEntries.reduce((s, x) => s + x.amount, 0);
+  if (groceryEntries.length > 0) bycat["Food & Essentials"] = groceryTotal;
+  if (tuitionEntries.length > 0) bycat["School Fees"]       = tuitionTotal;
+  if (otherEntries.length  > 0)  bycat["Other Expense"]    = otherTotal;
   return bycat;
 }
 
@@ -90,8 +132,23 @@ const MONTH_NAMES = {
 };
 
 // ── Parsers ──────────────────────────────────────────────────────────────────
+// Normalize legacy category names to current ones
+export function normalizeCat(cat) {
+  if (cat === "Groceries/Market") return "Food & Essentials";
+  if (cat === "Tuition")          return "School Fees";
+  return cat;
+}
+const CAT_ALIASES = {
+  "groceries/market": "Food & Essentials",
+  "groceries":        "Food & Essentials",
+  "grocery":          "Food & Essentials",
+  "food":             "Food & Essentials",
+  "tuition":          "School Fees",
+};
+
 function matchCat(raw) {
   const s = (raw || "").trim().toLowerCase();
+  if (CAT_ALIASES[s]) return CAT_ALIASES[s];
   return HOUSE_CATEGORIES.find((c) => c.key.toLowerCase() === s)?.key || null;
 }
 function matchSubcat(raw) {
@@ -151,7 +208,7 @@ export function parseGroceryBulk(text, defaultYear = new Date().getFullYear()) {
 }
 
 // ── Bills Import Panel ────────────────────────────────────────────────────────
-const BILLS_EXAMPLE = `2026\n\nElectricity\nJanuary, 7302.54, 312.5\nFebruary, 6948.82, 298.1\n\nWater\nJanuary, 450, 14.2\nFebruary, 480, 15.1\n\nInternet\nJanuary, 1499\nFebruary, 1499\n\nHouse Payment\nJanuary, 8500\n\nAssociation Dues\nJanuary, 500\n\nGroceries/Market\nJanuary, 6200`;
+const BILLS_EXAMPLE = `2026\n\nElectricity\nJanuary, 7302.54, 312.5\nFebruary, 6948.82, 298.1\n\nWater\nJanuary, 450, 14.2\nFebruary, 480, 15.1\n\nInternet\nJanuary, 1499\nFebruary, 1499\n\nHouse Payment\nJanuary, 8500\n\nAssociation Dues\nJanuary, 500\n\nFood & Essentials\nJanuary, 6200\n\nSchool Fees\nJanuary, 15000\n\nOther Expense\nJanuary, 2500`;
 
 function BillsImportPanel({ onImport, onClose }) {
   const [text, setText] = useState("");
@@ -290,10 +347,12 @@ export function HouseBulkImport({ onImport, onImportGrocery }) {
     <div style={{ display:"flex", flexDirection:"column", gap:14, marginTop:12 }}>
       <div style={{ display:"flex", gap:6, borderBottom:"1px solid var(--line)", paddingBottom:10 }}>
         <button className={importTab === "bills" ? "btn primary" : "btn secondary"} style={{ fontSize:13 }} onClick={() => setImportTab("bills")}>
-          🏠 House Bills
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight:5 }}><path d="M1 7l7-5 7 5v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/><path d="M5.5 15V9h5v6"/></svg>
+          House Bills
         </button>
         <button className={importTab === "grocery" ? "btn primary" : "btn secondary"} style={{ fontSize:13 }} onClick={() => setImportTab("grocery")}>
-          🛒 Grocery List
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight:5 }}><path d="M2 2h1.5l2 7h7l1.5-5H5"/><circle cx="6.5" cy="12.5" r="1"/><circle cx="11" cy="12.5" r="1"/></svg>
+          Food & Essentials
         </button>
       </div>
       {importTab === "bills"
@@ -355,8 +414,192 @@ function EntryModal({ initial, month, onSave, onClose }) {
   );
 }
 
+// ── Sub-item Modal (Tuition / Other Expense) ─────────────────────────────────
+function SubItemModal({ title, subcats, month, onSave, onClose }) {
+  const [subcat, setSubcat] = useState(subcats[0]);
+  const [desc,   setDesc]   = useState("");
+  const [amount, setAmount] = useState("");
+  const S = { display:"block", width:"100%", marginTop:6, padding:"8px 10px", borderRadius:8, border:"1px solid var(--line)", fontSize:14, background:"var(--bg)", color:"var(--text)" };
+  const L = { fontSize:12, fontWeight:600, color:"var(--muted)", textTransform:"uppercase", letterSpacing:.5 };
+  function submit(e) {
+    e.preventDefault();
+    if (!desc.trim() || !amount || isNaN(Number(amount))) return;
+    onSave({ subcat, desc: desc.trim(), amount: Number(amount), month });
+  }
+  return (
+    <div className="modal open" onClick={onClose}>
+      <div className="modalbox" style={{ maxWidth:420 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+          <h2 style={{ margin:0, fontSize:16 }}>Add {title} Item</h2>
+          <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--muted)", fontSize:18, lineHeight:1, padding:4 }}>✕</button>
+        </div>
+        <form onSubmit={submit} style={{ display:"flex", flexDirection:"column", gap:12 }}>
+          <label style={L}>Category
+            <select value={subcat} onChange={(e) => setSubcat(e.target.value)} style={S}>
+              {subcats.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
+          <label style={L}>Description
+            <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. School enrollment fee" required autoFocus style={S}/>
+          </label>
+          <label style={L}>Amount (PHP)
+            <input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" required style={S}/>
+          </label>
+          <div style={{ display:"flex", gap:8, justifyContent:"flex-end", marginTop:4 }}>
+            <button type="button" className="btn secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn primary"><IconPlus size={14}/> Add</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Sub-item list (shared by Tuition + Other Expense) ─────────────────────────
+function SubItemSection({ title, icon, items, subcats, month, onAdd, onDel }) {
+  const [open, setOpen] = useState(false);
+  const total = items.reduce((s, x) => s + x.amount, 0);
+  const bySubcat = Object.fromEntries(subcats.map((s) => [s, items.filter((x) => x.subcat === s)]));
+  return (
+    <>
+      <div className="card">
+        <div className="section-header" style={{ marginBottom: total > 0 ? 14 : 0 }}>
+          <h2 style={{ display:"flex", alignItems:"center", gap:7 }}>{icon} {title} — {monthLabel(month)}</h2>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            {total > 0 && <span style={{ fontWeight:700, color:"var(--accent)", fontSize:15 }}>{money(total)}</span>}
+            <button className="btn primary" onClick={() => setOpen(true)}><IconPlus size={14}/> Add</button>
+          </div>
+        </div>
+        {items.length > 0 ? (
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            {subcats.map((sub) => {
+              const rows = bySubcat[sub];
+              if (!rows?.length) return null;
+              const subTotal = rows.reduce((s, x) => s + x.amount, 0);
+              return (
+                <div key={sub}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                    <span style={{ fontWeight:600, fontSize:13 }}>{sub}</span>
+                    <span style={{ fontWeight:700, fontSize:13, color:"var(--accent)" }}>{money(subTotal)}</span>
+                  </div>
+                  <div className="tablewrap">
+                    <table><tbody>
+                      {rows.map((x) => (
+                        <tr key={x.id}>
+                          <td style={{ color:"var(--muted)", fontSize:13 }}>{x.desc}</td>
+                          <td className="amount">{money(x.amount)}</td>
+                          <td className="col-action-cell">
+                            <button style={{ background:"none", border:"none", color:"var(--muted)", cursor:"pointer", padding:5, borderRadius:6, display:"inline-flex" }}
+                              onMouseEnter={(e)=>e.currentTarget.style.color="var(--danger)"} onMouseLeave={(e)=>e.currentTarget.style.color="var(--muted)"}
+                              onClick={() => { if(confirm(`Delete "${x.desc}"?`)) onDel(x.id, x.sharedDocId); }}><IconTrash/></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody></table>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="empty">No {title.toLowerCase()} items yet for this month.</div>
+        )}
+      </div>
+      {open && <SubItemModal title={title} subcats={subcats} month={month} onSave={async (d) => { await onAdd(d); setOpen(false); }} onClose={() => setOpen(false)}/>}
+    </>
+  );
+}
+const STACKED_CATS = [
+  { key: "Electricity",      color: "#4a5adf" },
+  { key: "Water",            color: "#60a5fa" },
+  { key: "Internet",         color: "#a78bfa" },
+  { key: "House Payment",    color: "#f59e0b" },
+  { key: "Association Dues", color: "#10b981" },
+  { key: "Food & Essentials", color: "#f97316" },
+  { key: "School Fees",      color: "#ec4899" },
+  { key: "Other Expense",    color: "#94a3b8" },
+];
+
+const LINE_CATS = [
+  { key: "Electricity",      color: "#4a5adf" },
+  { key: "Water",            color: "#60a5fa" },
+  { key: "Food & Essentials", color: "#f97316" },
+];
+
+function LineTrendChart({ rows }) {
+  const W = 600, H = 180, PL = 8, PR = 8, PT = 20, PB = 28;
+  const chartW = W - PL - PR;
+  const chartH = H - PT - PB;
+  const months = rows.map((r) => new Date(r.key + "-01").toLocaleString("en-US", { month: "short" }));
+  const n = rows.length;
+
+  const allVals = LINE_CATS.flatMap(({ key }) => rows.map((r) => r.bycat[key] || 0));
+  const maxVal  = Math.max(...allVals, 1);
+
+  function x(i) { return PL + (i / (n - 1)) * chartW; }
+  function y(v) { return PT + chartH - (v / maxVal) * chartH; }
+
+  function polyline(key) {
+    return rows
+      .map((r, i) => `${x(i)},${y(r.bycat[key] || 0)}`)
+      .join(" ");
+  }
+
+  // Y-axis tick count
+  const ticks = 4;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", overflow: "visible" }}>
+      {/* Grid lines */}
+      {Array.from({ length: ticks + 1 }, (_, i) => {
+        const val = (maxVal / ticks) * i;
+        const yy  = y(val);
+        return (
+          <g key={i}>
+            <line x1={PL} y1={yy} x2={W - PR} y2={yy} stroke="var(--line)" strokeWidth={0.8} />
+            <text x={PL} y={yy - 3} fontSize={8} fill="var(--muted)" textAnchor="start">
+              {val >= 1000 ? `₱${(val / 1000).toFixed(0)}k` : `₱${val.toFixed(0)}`}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Lines + dots per category */}
+      {LINE_CATS.map(({ key, color }) => {
+        const pts = rows.map((r, i) => [x(i), y(r.bycat[key] || 0)]);
+        // smooth bezier path
+        const d = pts.reduce((acc, [px, py], i) => {
+          if (i === 0) return `M ${px} ${py}`;
+          const [ppx, ppy] = pts[i - 1];
+          const cpx = (ppx + px) / 2;
+          return `${acc} C ${cpx} ${ppy}, ${cpx} ${py}, ${px} ${py}`;
+        }, "");
+        return (
+          <g key={key}>
+            <path d={d} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
+            {pts.map(([px, py], i) => {
+              const val = rows[i].bycat[key] || 0;
+              return val > 0 ? (
+                <g key={i}>
+                  <circle cx={px} cy={py} r={3.5} fill={color} />
+                  <circle cx={px} cy={py} r={6} fill={color} fillOpacity={0.12} />
+                </g>
+              ) : null;
+            })}
+          </g>
+        );
+      })}
+
+      {/* X-axis labels */}
+      {months.map((mo, i) => (
+        <text key={i} x={x(i)} y={H - 4} fontSize={9} fill="var(--muted)" textAnchor="middle">{mo}</text>
+      ))}
+    </svg>
+  );
+}
+
 // ── Monthly Summary (exported for standalone page) ───────────────────────────
-export function HouseMonthlySummary({ allHouse, allGrocery = [] }) {
+export function HouseMonthlySummary({ allHouse, allGrocery = [], allTuition = [], allOtherExpense = [] }) {
   const availableYears = useMemo(() => {
     const years = [...new Set(allHouse.map((x) => x.month?.slice(0,4)).filter(Boolean))].sort().reverse();
     if (!years.length) years.push(String(new Date().getFullYear()));
@@ -371,8 +614,10 @@ export function HouseMonthlySummary({ allHouse, allGrocery = [] }) {
     return Array.from({ length: 12 }, (_, i) => {
       const key = `${resolvedYear}-${String(i + 1).padStart(2, "0")}`;
       const entries = allHouse.filter((x) => x.month === key);
-      const groceryEntries = allGrocery.filter((x) => x.month === key);
-      const bycat = effectiveHouseBycat(entries, groceryEntries);
+      const groceryEntries  = allGrocery.filter((x) => x.month === key);
+      const tuitionEntries  = allTuition.filter((x) => x.month === key);
+      const otherEntries    = allOtherExpense.filter((x) => x.month === key);
+      const bycat = effectiveHouseBycat(entries, groceryEntries, tuitionEntries, otherEntries);
       const total = Object.values(bycat).reduce((s, v) => s + v, 0);
       return { key, total, bycat, count: entries.length };
     });
@@ -431,30 +676,46 @@ export function HouseMonthlySummary({ allHouse, allGrocery = [] }) {
         </div>
       </div>
 
-      {/* Charts row */}
+      {/* Charts row — stacked bar + category breakdown */}
       <div className="two">
-        {/* Monthly spending bar chart */}
+        {/* Stacked bar chart */}
         <div className="card">
           <div className="section-title">
             <h2>{resolvedYear} Monthly Spending</h2>
             <span>{allHouse.filter((x) => x.month?.startsWith(resolvedYear)).length} entries</span>
           </div>
-          <div className="bars">
-            {rows.map((r) => (
-              <div className="barwrap" key={r.key}>
-                <div className="barvalue">{r.total ? money(r.total) : ""}</div>
-                <div className="bar" style={{ height: Math.max(2, Math.round((r.total / maxM) * 165)) }} />
-                <div className="barlabel">{new Date(r.key + "-01").toLocaleString("en-US", { month: "short" })}</div>
-              </div>
+          {/* Legend */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", marginBottom: 12 }}>
+            {STACKED_CATS.map(({ key, color }) => (
+              <span key={key} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--muted)" }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: color, display: "inline-block", flexShrink: 0 }} />
+                {key}
+              </span>
             ))}
+          </div>
+          {/* Bars */}
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 140 }}>
+            {rows.map((r) => {
+              const mo = new Date(r.key + "-01").toLocaleString("en-US", { month: "short" });
+              return (
+                <div key={r.key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, height: "100%", justifyContent: "flex-end" }}>
+                  <div style={{ width: "100%", display: "flex", flexDirection: "column-reverse", borderRadius: "4px 4px 0 0", overflow: "hidden" }}>
+                    {STACKED_CATS.map(({ key, color }) => {
+                      const val = r.bycat[key] || 0;
+                      const h   = val ? Math.max(3, Math.round((val / maxM) * 120)) : 0;
+                      return h > 0 ? <div key={key} style={{ width: "100%", height: h, background: color }} /> : null;
+                    })}
+                  </div>
+                  <span style={{ fontSize: 9, color: "var(--muted)" }}>{mo}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Category breakdown */}
+        {/* Category breakdown horizontal bars */}
         <div className="card">
-          <div className="section-title">
-            <h2>Category Breakdown</h2>
-          </div>
+          <div className="section-title"><h2>Category Breakdown</h2></div>
           {yearTotal > 0 ? (
             HOUSE_CATEGORIES.map(({ key, icon }) => (
               <div className="catrow" key={key}>
@@ -471,6 +732,23 @@ export function HouseMonthlySummary({ allHouse, allGrocery = [] }) {
             <div className="empty">No expenses yet.</div>
           )}
         </div>
+      </div>
+
+      {/* Line chart — Electricity, Water, Food & Essentials */}
+      <div className="card">
+        <div className="section-title" style={{ marginBottom: 4 }}>
+          <h2>Utility & Grocery Trends — {resolvedYear}</h2>
+        </div>
+        {/* Legend */}
+        <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+          {LINE_CATS.map(({ key, color }) => (
+            <span key={key} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--muted)" }}>
+              <span style={{ width: 20, height: 2, background: color, display: "inline-block", borderRadius: 2 }} />
+              {key}
+            </span>
+          ))}
+        </div>
+        <LineTrendChart rows={rows} year={resolvedYear} />
       </div>
 
       {/* Monthly breakdown table */}
@@ -525,6 +803,8 @@ export function HouseMonthlySummary({ allHouse, allGrocery = [] }) {
 export default function HouseExpenses({
   house, month, onAdd, onUpdate, onDelete, allHouse,
   grocery, allGrocery, onAddGrocery, onDelGrocery,
+  tuition, onAddTuition, onDelTuition,
+  otherExpense, onAddOther, onDelOther,
 }) {
   const [modal, setModal] = useState(null);
 
@@ -537,7 +817,7 @@ export default function HouseExpenses({
   const groceryTotal = grocery.reduce((s,x) => s+x.amount, 0);
 
   async function handleSave(data) {
-    if (modal?.id) await onUpdate(modal.id, { cat:data.category, amount:data.amount, note:data.note, usage:data.usage??null, month:data.month });
+    if (modal?.id) await onUpdate(modal.id, { cat:data.category, amount:data.amount, note:data.note, usage:data.usage??null, month:data.month, sharedDocId:modal.sharedDocId });
     else await onAdd(data);
     setModal(null);
   }
@@ -556,7 +836,7 @@ export default function HouseExpenses({
           {/* Category chips */}
           <div style={{ display:"flex", flexWrap:"wrap", gap:8, margin:"14px 0 10px" }}>
             {HOUSE_CATEGORIES.map(({ key, icon }) => {
-              const amt = house.filter((x) => x.cat===key).reduce((s,x)=>s+x.amount,0);
+              const amt = house.filter((x) => normalizeCat(x.cat)===key).reduce((s,x)=>s+x.amount,0);
               return (
                 <div key={key} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", borderRadius:20,
                   background: amt?"var(--accent-bg)":"var(--bg)", border:`1px solid ${amt?"var(--accent-soft)":"var(--line)"}`,
@@ -575,12 +855,13 @@ export default function HouseExpenses({
                 <thead><tr><th></th><th>Category</th><th style={{ textAlign:"right" }}>Usage</th><th>Note</th><th style={{ textAlign:"right" }}>Amount</th><th></th><th></th></tr></thead>
                 <tbody>
                   {house.map((x) => {
-                    const meta = HOUSE_CATEGORIES.find((c) => c.key===x.cat)||{};
-                    const uc = USAGE_CONFIG[x.cat];
+                    const displayCat = normalizeCat(x.cat);
+                    const meta = HOUSE_CATEGORIES.find((c) => c.key===displayCat)||{};
+                    const uc = USAGE_CONFIG[displayCat];
                     return (
                       <tr key={x.id}>
                         <td style={{ textAlign:"center", paddingTop:2 }}><HouseCatIcon type={meta.icon} size={18}/></td>
-                        <td style={{ fontWeight:500 }}>{x.cat}</td>
+                        <td style={{ fontWeight:500 }}>{displayCat}</td>
                         <td style={{ textAlign:"right", color:"var(--muted)", fontSize:13 }}>
                           {uc && x.usage != null ? <span>{x.usage.toLocaleString()} <span style={{ fontSize:11 }}>{uc.unit}</span></span> : uc ? "—" : ""}
                         </td>
@@ -594,7 +875,7 @@ export default function HouseExpenses({
                         <td className="col-action-cell">
                           <button style={{ background:"none", border:"none", color:"var(--muted)", cursor:"pointer", padding:5, borderRadius:6, display:"inline-flex" }} title="Delete"
                             onMouseEnter={(e)=>e.currentTarget.style.color="var(--danger)"} onMouseLeave={(e)=>e.currentTarget.style.color="var(--muted)"}
-                            onClick={() => { if(confirm(`Delete this ${x.cat} entry?`)) onDelete(x.id); }}><IconTrash/></button>
+                            onClick={() => { if(confirm(`Delete this ${displayCat} entry?`)) onDelete(x.id, x.sharedDocId); }}><IconTrash/></button>
                         </td>
                       </tr>
                     );
@@ -611,7 +892,7 @@ export default function HouseExpenses({
       {grocery.length > 0 && (
         <div className="card">
           <div className="section-header" style={{ marginBottom:14 }}>
-            <h2>🛒 Grocery Breakdown — {monthLabel(month)}</h2>
+            <h2>Food & Essentials — {monthLabel(month)}</h2>
             {groceryTotal > 0 && <span style={{ fontWeight:700, color:"var(--accent)", fontSize:15 }}>{money(groceryTotal)}</span>}
           </div>
           {grocery.length === 0 ? (
@@ -638,7 +919,7 @@ export default function HouseExpenses({
                               <td className="col-action-cell">
                                 <button style={{ background:"none", border:"none", color:"var(--muted)", cursor:"pointer", padding:5, borderRadius:6, display:"inline-flex" }} title="Delete"
                                   onMouseEnter={(e)=>e.currentTarget.style.color="var(--danger)"} onMouseLeave={(e)=>e.currentTarget.style.color="var(--muted)"}
-                                  onClick={() => { if(confirm(`Delete "${x.desc}"?`)) onDelGrocery(x.id); }}><IconTrash/></button>
+                                  onClick={() => { if(confirm(`Delete "${x.desc}"?`)) onDelGrocery(x.id, x.sharedDocId); }}><IconTrash/></button>
                               </td>
                             </tr>
                           ))}
@@ -652,6 +933,12 @@ export default function HouseExpenses({
           )}
         </div>
       )}
+
+      {/* ── School Fees ── */}
+      <SubItemSection title="School Fees" icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="var(--accent)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M8 1L1 5l7 4 7-4-7-4z"/><path d="M4 6.5v4a4 4 0 0 0 8 0v-4"/></svg>} items={tuition} subcats={TUITION_SUBCATS} month={month} onAdd={onAddTuition} onDel={onDelTuition}/>
+
+      {/* ── Other Expense ── */}
+      <SubItemSection title="Other Expense" icon={<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="var(--accent)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3M8 11v.5"/></svg>} items={otherExpense} subcats={OTHER_EXPENSE_SUBCATS} month={month} onAdd={onAddOther} onDel={onDelOther}/>
 
       {modal && (
         <EntryModal initial={modal==="add"?null:modal} month={month} onSave={handleSave} onClose={() => setModal(null)}/>
