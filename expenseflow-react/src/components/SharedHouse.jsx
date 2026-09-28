@@ -382,20 +382,20 @@ export default function SharedHouse({
       </div>
 
       {/* Sub-nav tabs */}
-      <div style={{ display: "flex", gap: 6, margin: "14px 0", flexWrap: "wrap" }}>
+      <div className="tab-bar">
         {[
-          { key: "dashboard", label: "Dashboard",       icon: <IconHome size={13}/> },
-          { key: "summary",   label: "Monthly Summary", icon: <IconYear size={13}/> },
-          ...(isOwner ? [{ key: "import", label: "Bulk Import", icon: <IconImport size={13}/> }] : []),
-          { key: "members",   label: "Members",         icon: null },
+          { key: "dashboard", label: "Dashboard",       icon: <IconHome size={14}/> },
+          { key: "summary",   label: "Monthly Summary", icon: <IconYear size={14}/> },
+          ...(isOwner ? [{ key: "import", label: "Bulk Import", icon: <IconImport size={14}/> }] : []),
+          { key: "members",   label: "Members",         icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="5" r="2.5"/><path d="M1 14c0-3 2-4.5 5-4.5s5 1.5 5 4.5"/><circle cx="12" cy="5" r="2"/><path d="M15 13c0-2-1.3-3.5-3-3.5"/></svg> },
         ].map(({ key, label, icon }) => (
           <button
             key={key}
-            className={subView === key ? "btn primary" : "btn secondary"}
-            style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}
+            className={`tab-btn${subView === key ? " active" : ""}`}
             onClick={() => setSubView(key)}
           >
-            {icon}{label}
+            {icon}
+            <span>{label}</span>
           </button>
         ))}
       </div>

@@ -327,20 +327,26 @@ function TripDashboard({ trip, expenses, isOwner, loading, onAdd, onUpdate, onDe
         )}
       </div>
 
-      {/* Category totals */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(140px, 1fr))", gap:10, marginBottom:20 }}>
+      {/* Category totals — horizontal scroll strip */}
+      <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:4, marginBottom:20, scrollbarWidth:"none" }}>
         {TRAVEL_CATEGORIES.map((c) => (
-          <div key={c.key} className="card" style={{ padding:"12px 14px", borderLeft:`3px solid ${c.color}` }}>
-            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
-              <TravelCatIcon type={c.icon} size={13} />
-              <span style={{ fontSize:11, color:"var(--muted)", fontWeight:600 }}>{c.key}</span>
+          <div key={c.key} style={{
+            flexShrink:0, minWidth:110, background:"var(--card)",
+            border:"1px solid var(--line)", borderRadius:12,
+            borderTop:`3px solid ${c.color}`, padding:"10px 12px",
+          }}>
+            <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:4 }}>
+              <TravelCatIcon type={c.icon} size={12} />
+              <span style={{ fontSize:10, color:"var(--muted)", fontWeight:700, textTransform:"uppercase", letterSpacing:".04em" }}>{c.key}</span>
             </div>
-            <div style={{ fontWeight:800, fontSize:16 }}>{money(totals[c.key] || 0)}</div>
+            <div style={{ fontWeight:800, fontSize:15, color: totals[c.key] ? "var(--text)" : "var(--muted)" }}>
+              {money(totals[c.key] || 0)}
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Expense table */}
+      {/* Expense list */}
       {loading && <div style={{ color:"var(--muted)", fontSize:14 }}>Loading…</div>}
       {!loading && expenses.length === 0 && (
         <div style={{ color:"var(--muted)", fontSize:14, textAlign:"center", padding:"32px 0" }}>
@@ -349,143 +355,201 @@ function TripDashboard({ trip, expenses, isOwner, loading, onAdd, onUpdate, onDe
       )}
 
       {!loading && expenses.length > 0 && (
-        <div className="card" style={{ padding:0, overflow:"auto" }}>
-          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-            <thead>
-              <tr style={{ background:"var(--bg)", borderBottom:"2px solid var(--line)" }}>
-                <th style={th}>Category</th>
-                <th style={th}>Description</th>
-                <th style={th}>Date</th>
-                <th style={{ ...th, textAlign:"right" }}>Amount</th>
-                <th style={{ ...th, textAlign:"right" }}>Split / Assigned to</th>
-                {isOwner && <th style={th}></th>}
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((exp, i) => {
-                const isIndividual = exp.splitType === "individual";
-                return (
-                  <tr key={exp.id}
-                    style={{ borderBottom: i < sorted.length - 1 ? "1px solid var(--line)" : "none",
-                      background: i % 2 === 0 ? "var(--card)" : "var(--bg)" }}>
-                    <td style={td}>
-                      <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                        <span style={{ width:22, height:22, borderRadius:6, background:"var(--accent-bg)",
-                          display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                          <TravelCatIcon type={catIcon(exp.cat)} size={12} />
-                        </span>
-                        <span style={{ background: catColor(exp.cat) + "22", color: catColor(exp.cat),
-                          borderRadius:4, padding:"2px 6px", fontWeight:600, fontSize:11, whiteSpace:"nowrap" }}>
-                          {exp.cat}
-                        </span>
-                      </div>
-                    </td>
-                    <td style={td}>{exp.desc || <span style={{ color:"var(--muted)" }}>—</span>}</td>
-                    <td style={{ ...td, whiteSpace:"nowrap", color:"var(--muted)" }}>{fmtDate(exp.date)}</td>
-                    <td style={{ ...td, textAlign:"right", fontWeight:700 }}>{money(exp.amount)}</td>
-                    <td style={{ ...td, textAlign:"right" }}>
-                      {isIndividual ? (
-                        <span style={{ background:"#f1f5f9", color:"var(--text)", borderRadius:6,
-                          padding:"2px 8px", fontSize:11, fontWeight:600, whiteSpace:"nowrap" }}>
-                          👤 {exp.assignedTo}
-                        </span>
-                      ) : (
-                        <span style={{ color:"var(--accent)", fontWeight:600 }}>
-                          {money(exp.amount / memberCount)}
-                          <span style={{ fontSize:10, color:"var(--muted)", marginLeft:3 }}>÷{memberCount}</span>
-                        </span>
-                      )}
-                    </td>
-                    {isOwner && (
-                      <td style={{ ...td, whiteSpace:"nowrap" }}>
-                        <button style={{ background:"none", border:"none", cursor:"pointer", color:"var(--muted)", padding:"2px 4px" }}
-                          onClick={() => openEdit(exp)} title="Edit"><IconEdit /></button>
-                        <button style={{ background:"none", border:"none", cursor:"pointer", color:"var(--danger)", padding:"2px 4px" }}
-                          onClick={() => { if (confirm("Delete this expense?")) onDelete(exp.id); }} title="Delete"><IconTrash /></button>
+        <div className="card" style={{ padding:0, marginBottom:16 }}>
+          {/* ── Desktop table ── */}
+          <div className="tx-table-desktop" style={{ overflowX:"auto" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+              <thead>
+                <tr style={{ background:"var(--bg)", borderBottom:"2px solid var(--line)" }}>
+                  <th style={th}>Category</th>
+                  <th style={th}>Description</th>
+                  <th style={th}>Date</th>
+                  <th style={{ ...th, textAlign:"right" }}>Amount</th>
+                  <th style={{ ...th, textAlign:"right" }}>Split / Assigned to</th>
+                  {isOwner && <th style={th}></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((exp, i) => {
+                  const isIndividual = exp.splitType === "individual";
+                  return (
+                    <tr key={exp.id} style={{ borderBottom: i < sorted.length - 1 ? "1px solid var(--line)" : "none", background: i % 2 === 0 ? "var(--card)" : "var(--bg)" }}>
+                      <td style={td}>
+                        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                          <span style={{ width:22, height:22, borderRadius:6, background:"var(--accent-bg)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                            <TravelCatIcon type={catIcon(exp.cat)} size={12} />
+                          </span>
+                          <span style={{ background: catColor(exp.cat) + "22", color: catColor(exp.cat), borderRadius:4, padding:"2px 6px", fontWeight:600, fontSize:11, whiteSpace:"nowrap" }}>{exp.cat}</span>
+                        </div>
                       </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr style={{ background:"var(--accent-bg)", borderTop:"2px solid var(--accent-soft, var(--line))" }}>
-                <td style={{ ...td, fontWeight:800, color:"var(--accent)" }} colSpan={3}>
-                  {expenses.length} item{expenses.length !== 1 ? "s" : ""}
-                  {individualTotal > 0 && (
-                    <span style={{ fontSize:11, color:"var(--muted)", fontWeight:400, marginLeft:8 }}>
-                      (shared: {money(sharedTotal)} · individual: {money(individualTotal)})
+                      <td style={td}>{exp.desc || <span style={{ color:"var(--muted)" }}>—</span>}</td>
+                      <td style={{ ...td, whiteSpace:"nowrap", color:"var(--muted)" }}>{fmtDate(exp.date)}</td>
+                      <td style={{ ...td, textAlign:"right", fontWeight:700 }}>{money(exp.amount)}</td>
+                      <td style={{ ...td, textAlign:"right" }}>
+                        {isIndividual ? (
+                          <span style={{ background:"#f1f5f9", color:"var(--text)", borderRadius:6, padding:"2px 8px", fontSize:11, fontWeight:600, whiteSpace:"nowrap" }}>👤 {exp.assignedTo}</span>
+                        ) : (
+                          <span style={{ color:"var(--accent)", fontWeight:600 }}>
+                            {money(exp.amount / memberCount)}<span style={{ fontSize:10, color:"var(--muted)", marginLeft:3 }}>÷{memberCount}</span>
+                          </span>
+                        )}
+                      </td>
+                      {isOwner && (
+                        <td style={{ ...td, whiteSpace:"nowrap" }}>
+                          <button style={{ background:"none", border:"none", cursor:"pointer", color:"var(--muted)", padding:"2px 4px" }} onClick={() => openEdit(exp)} title="Edit"><IconEdit /></button>
+                          <button style={{ background:"none", border:"none", cursor:"pointer", color:"var(--danger)", padding:"2px 4px" }} onClick={() => { if (confirm("Delete this expense?")) onDelete(exp.id); }} title="Delete"><IconTrash /></button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr style={{ background:"var(--accent-bg)", borderTop:"2px solid var(--accent-soft, var(--line))" }}>
+                  <td style={{ ...td, fontWeight:800, color:"var(--accent)" }} colSpan={3}>
+                    {expenses.length} item{expenses.length !== 1 ? "s" : ""}
+                    {individualTotal > 0 && <span style={{ fontSize:11, color:"var(--muted)", fontWeight:400, marginLeft:8 }}>(shared: {money(sharedTotal)} · individual: {money(individualTotal)})</span>}
+                  </td>
+                  <td style={{ ...td, textAlign:"right", fontWeight:900, fontSize:15 }}>{money(grandTotal)}</td>
+                  <td style={{ ...td, textAlign:"right", fontWeight:900, fontSize:15, color:"var(--accent)" }}>
+                    {money(perPersonShared)}<div style={{ fontSize:10, color:"var(--muted)", fontWeight:400 }}>shared ÷{memberCount}</div>
+                  </td>
+                  {isOwner && <td style={td}></td>}
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          {/* ── Mobile cards ── */}
+          <div className="tx-card-list" style={{ padding:"0 4px" }}>
+            {sorted.map((exp) => {
+              const isIndividual = exp.splitType === "individual";
+              return (
+                <div key={exp.id} style={{
+                  padding:"14px 8px", borderBottom:"1px solid var(--line)",
+                  display:"flex", flexDirection:"column", gap:8,
+                }}>
+                  {/* Row 1: desc + amount */}
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <span style={{
+                        background: catColor(exp.cat) + "22", color: catColor(exp.cat),
+                        borderRadius:4, padding:"2px 7px", fontWeight:700, fontSize:11,
+                        marginRight:7, whiteSpace:"nowrap",
+                      }}>{exp.cat}</span>
+                      <span style={{ fontWeight:600, fontSize:14, color:"var(--text)" }}>{exp.desc || "—"}</span>
+                    </div>
+                    <span style={{ fontWeight:800, fontSize:15, color:"var(--accent)", whiteSpace:"nowrap", flexShrink:0 }}>
+                      {money(exp.amount)}
                     </span>
-                  )}
-                </td>
-                <td style={{ ...td, textAlign:"right", fontWeight:900, fontSize:15 }}>{money(grandTotal)}</td>
-                <td style={{ ...td, textAlign:"right", fontWeight:900, fontSize:15, color:"var(--accent)" }}>
-                  {money(perPersonShared)}
-                  <div style={{ fontSize:10, color:"var(--muted)", fontWeight:400 }}>shared ÷{memberCount}</div>
-                </td>
-                {isOwner && <td style={td}></td>}
-              </tr>
-            </tfoot>
-          </table>
+                  </div>
+                  {/* Row 2: date + split + actions */}
+                  <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+                    <span style={{ fontSize:12, color:"var(--muted)" }}>{fmtDate(exp.date)}</span>
+                    {isIndividual
+                      ? <span style={{ fontSize:12, color:"var(--muted)" }}>👤 {exp.assignedTo}</span>
+                      : <span style={{ fontSize:12, color:"var(--accent)", fontWeight:600 }}>{money(exp.amount / memberCount)} each</span>
+                    }
+                    {isOwner && (
+                      <div style={{ marginLeft:"auto", display:"flex", gap:6 }}>
+                        <button style={{ background:"var(--accent-bg)", border:"none", borderRadius:6, cursor:"pointer", color:"var(--accent)", padding:"4px 10px", fontSize:12, fontWeight:600 }}
+                          onClick={() => openEdit(exp)}>Edit</button>
+                        <button style={{ background:"#fdeaea", border:"none", borderRadius:6, cursor:"pointer", color:"var(--danger)", padding:"4px 10px", fontSize:12, fontWeight:600 }}
+                          onClick={() => { if (confirm("Delete this expense?")) onDelete(exp.id); }}>Delete</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {/* Total row */}
+            <div style={{ display:"flex", justifyContent:"space-between", padding:"14px 8px", fontWeight:800, fontSize:15, borderTop:"2px solid var(--line)", marginTop:4 }}>
+              <span style={{ color:"var(--muted)" }}>{expenses.length} item{expenses.length !== 1 ? "s" : ""}</span>
+              <span style={{ color:"var(--accent)" }}>{money(grandTotal)}</span>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Per-person breakdown */}
       {!loading && expenses.length > 0 && memberCount > 1 && (
-        <div className="card" style={{ padding:0, overflow:"auto", marginTop:16 }}>
+        <div className="card" style={{ padding:0, marginTop:16 }}>
           <div style={{ padding:"12px 16px", borderBottom:"2px solid var(--line)", fontWeight:800, fontSize:14 }}>
             Per-person Breakdown
           </div>
-          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-            <thead>
-              <tr style={{ background:"var(--bg)", borderBottom:"1px solid var(--line)" }}>
-                <th style={th}>Person</th>
-                <th style={{ ...th, textAlign:"right" }}>Shared portion</th>
-                <th style={{ ...th, textAlign:"right" }}>Individual</th>
-                <th style={{ ...th, textAlign:"right" }}>Total owed</th>
-              </tr>
-            </thead>
-            <tbody>
-              {memberNames.map((name, i) => {
-                const indiv = expenses
-                  .filter((e) => e.splitType === "individual" && e.assignedTo === name)
-                  .reduce((s, e) => s + e.amount, 0);
-                const total = perPersonShared + indiv;
-                return (
-                  <tr key={name} style={{ borderBottom: i < memberNames.length - 1 ? "1px solid var(--line)" : "none",
-                    background: i % 2 === 0 ? "var(--card)" : "var(--bg)" }}>
-                    <td style={td}>
-                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                        <span style={{ width:26, height:26, borderRadius:"50%", flexShrink:0,
-                          background: i === 0 ? "var(--accent)" : "var(--accent-bg)",
-                          color: i === 0 ? "#fff" : "var(--accent)",
-                          display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:800 }}>
-                          {name[0].toUpperCase()}
-                        </span>
-                        <span style={{ fontWeight:600 }}>{name}</span>
-                        {i === 0 && <span style={{ fontSize:10, color:"var(--accent)", fontWeight:700 }}>owner</span>}
-                      </div>
-                    </td>
-                    <td style={{ ...td, textAlign:"right", color:"var(--muted)" }}>{money(perPersonShared)}</td>
-                    <td style={{ ...td, textAlign:"right", color: indiv > 0 ? "var(--text)" : "var(--muted)" }}>
-                      {indiv > 0 ? money(indiv) : "—"}
-                    </td>
-                    <td style={{ ...td, textAlign:"right", fontWeight:800, color:"var(--accent)", fontSize:14 }}>
-                      {money(total)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr style={{ background:"var(--accent-bg)", borderTop:"2px solid var(--accent-soft, var(--line))" }}>
-                <td style={{ ...td, fontWeight:800, color:"var(--accent)" }}>Grand Total</td>
-                <td style={{ ...td, textAlign:"right", fontWeight:700 }}>{money(sharedTotal)}</td>
-                <td style={{ ...td, textAlign:"right", fontWeight:700 }}>{money(individualTotal)}</td>
-                <td style={{ ...td, textAlign:"right", fontWeight:900, fontSize:15, color:"var(--accent)" }}>{money(grandTotal)}</td>
-              </tr>
-            </tfoot>
-          </table>
+          {/* Desktop */}
+          <div className="tx-table-desktop" style={{ overflowX:"auto" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+              <thead>
+                <tr style={{ background:"var(--bg)", borderBottom:"1px solid var(--line)" }}>
+                  <th style={th}>Person</th>
+                  <th style={{ ...th, textAlign:"right" }}>Shared portion</th>
+                  <th style={{ ...th, textAlign:"right" }}>Individual</th>
+                  <th style={{ ...th, textAlign:"right" }}>Total owed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {memberNames.map((name, i) => {
+                  const indiv = expenses.filter((e) => e.splitType === "individual" && e.assignedTo === name).reduce((s, e) => s + e.amount, 0);
+                  const total = perPersonShared + indiv;
+                  return (
+                    <tr key={name} style={{ borderBottom: i < memberNames.length - 1 ? "1px solid var(--line)" : "none", background: i % 2 === 0 ? "var(--card)" : "var(--bg)" }}>
+                      <td style={td}>
+                        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                          <span style={{ width:26, height:26, borderRadius:"50%", flexShrink:0, background: i === 0 ? "var(--accent)" : "var(--accent-bg)", color: i === 0 ? "#fff" : "var(--accent)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:800 }}>{name[0].toUpperCase()}</span>
+                          <span style={{ fontWeight:600 }}>{name}</span>
+                          {i === 0 && <span style={{ fontSize:10, color:"var(--accent)", fontWeight:700 }}>owner</span>}
+                        </div>
+                      </td>
+                      <td style={{ ...td, textAlign:"right", color:"var(--muted)" }}>{money(perPersonShared)}</td>
+                      <td style={{ ...td, textAlign:"right", color: indiv > 0 ? "var(--text)" : "var(--muted)" }}>{indiv > 0 ? money(indiv) : "—"}</td>
+                      <td style={{ ...td, textAlign:"right", fontWeight:800, color:"var(--accent)", fontSize:14 }}>{money(total)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr style={{ background:"var(--accent-bg)", borderTop:"2px solid var(--accent-soft, var(--line))" }}>
+                  <td style={{ ...td, fontWeight:800, color:"var(--accent)" }}>Grand Total</td>
+                  <td style={{ ...td, textAlign:"right", fontWeight:700 }}>{money(sharedTotal)}</td>
+                  <td style={{ ...td, textAlign:"right", fontWeight:700 }}>{money(individualTotal)}</td>
+                  <td style={{ ...td, textAlign:"right", fontWeight:900, fontSize:15, color:"var(--accent)" }}>{money(grandTotal)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          {/* Mobile cards */}
+          <div className="tx-card-list" style={{ padding:"0 4px" }}>
+            {memberNames.map((name, i) => {
+              const indiv = expenses.filter((e) => e.splitType === "individual" && e.assignedTo === name).reduce((s, e) => s + e.amount, 0);
+              const total = perPersonShared + indiv;
+              return (
+                <div key={name} style={{ padding:"14px 8px", borderBottom:"1px solid var(--line)", display:"flex", alignItems:"center", gap:12 }}>
+                  <span style={{ width:36, height:36, borderRadius:"50%", flexShrink:0,
+                    background: i === 0 ? "var(--accent)" : "var(--accent-bg)",
+                    color: i === 0 ? "#fff" : "var(--accent)",
+                    display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:800 }}>
+                    {name[0].toUpperCase()}
+                  </span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                      <span style={{ fontWeight:700, fontSize:14 }}>{name}</span>
+                      {i === 0 && <span style={{ fontSize:10, color:"var(--accent)", fontWeight:700, background:"var(--accent-bg)", padding:"1px 6px", borderRadius:8 }}>owner</span>}
+                    </div>
+                    <div style={{ fontSize:12, color:"var(--muted)", marginTop:2 }}>
+                      Shared: {money(perPersonShared)}
+                      {indiv > 0 && <span style={{ marginLeft:8 }}>· Individual: {money(indiv)}</span>}
+                    </div>
+                  </div>
+                  <span style={{ fontWeight:800, fontSize:15, color:"var(--accent)", flexShrink:0 }}>{money(total)}</span>
+                </div>
+              );
+            })}
+            <div style={{ display:"flex", justifyContent:"space-between", padding:"14px 8px", fontWeight:800, fontSize:15, borderTop:"2px solid var(--line)" }}>
+              <span style={{ color:"var(--accent)" }}>Grand Total</span>
+              <span style={{ color:"var(--accent)" }}>{money(grandTotal)}</span>
+            </div>
+          </div>
         </div>
       )}
 

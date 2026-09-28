@@ -62,7 +62,7 @@ body {
 }
 
 /* ── App shell ── */
-.app { display: flex; min-height: 100vh; }
+.app { display: flex; min-height: 100vh; overflow-x: hidden; }
 
 /* ══════════════════════════════════
    SIDEBAR  (desktop: fixed left)
@@ -206,6 +206,7 @@ body {
   width: calc(100% - var(--nav-w));
   padding: 28px 30px;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 /* ── Top bar ── */
@@ -320,6 +321,37 @@ td.col-action-cell{ text-align: center; padding: 8px; }
 
 .tag { padding: 3px 9px; background: var(--accent-bg); color: var(--accent); border-radius: 20px; font-size: 11px; font-weight: 600; }
 
+/* ── Tab bar ── */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  margin: 16px 0;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 5px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.tab-bar::-webkit-scrollbar { display: none; }
+.tab-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 14px;
+  border: none; border-radius: 10px;
+  background: none; color: var(--muted);
+  font-size: 13px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+  transition: background .15s, color .15s;
+  flex-shrink: 0;
+}
+.tab-btn:hover { background: var(--accent-bg); color: var(--accent); }
+.tab-btn.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(74,90,223,.25);
+}
+
 /* ── Empty state ── */
 .empty { text-align: center; color: var(--muted); padding: 32px; font-size: 13px; }
 
@@ -337,16 +369,24 @@ td.col-action-cell{ text-align: center; padding: 8px; }
 .tx-card {
   padding: 12px 4px;
   border-bottom: 1px solid var(--line);
-  display: flex; flex-direction: column; gap: 6px;
+  display: flex; align-items: center; gap: 10px;
 }
 .tx-card:last-child { border-bottom: none; }
+.tx-x-btn {
+  background: none; border: none;
+  color: var(--danger); cursor: pointer;
+  width: 28px; height: 28px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: background .12s;
+}
+.tx-x-btn:hover { background: #fdeaea; }
 .tx-card-main {
   display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
 }
 .tx-card-desc { font-weight: 600; font-size: 14px; color: var(--text); flex: 1; }
 .tx-card-amount { font-weight: 800; font-size: 14px; color: var(--accent); white-space: nowrap; }
 .tx-card-meta {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px;
 }
 .tx-card-date { font-size: 11px; color: var(--muted); }
 
@@ -524,12 +564,15 @@ details.month-breakdown-row.empty-month:not([open]) .mbl-month::after { content:
   .tx-table-desktop { display: none; }
   .tx-card-list     { display: flex; }
 
+  /* Tab bar: compact on mobile */
+  .tab-btn { padding: 7px 10px; font-size: 12px; gap: 5px; }
+
   /* Bar chart: compress on mobile */
-  .bars         { height: 120px; gap: 3px; overflow-x: hidden; }
-  .barwrap      { min-width: 0; }
-  .bar          { max-width: 20px; }
-  .barvalue     { font-size: 0; } /* hide value labels on mobile — too cramped */
-  .barlabel     { font-size: 9px; }
+  .bars         { height: 120px; gap: 3px; overflow-x: hidden; overflow-y: hidden; }
+  .barwrap      { min-width: 0; flex-shrink: 1; }
+  .bar          { max-width: 20px; width: 80%; }
+  .barvalue     { display: none; }
+  .barlabel     { display: none; }
 }
 
 @media (max-width: 380px) {

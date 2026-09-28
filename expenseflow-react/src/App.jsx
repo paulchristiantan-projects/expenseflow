@@ -57,6 +57,7 @@ export default function App() {
   const [modalOpen, setModalOpen] = useState(false);
   const [theme,     setTheme]     = useState(() => localStorage.getItem("theme") || "light");
   const [mobileNav, setMobileNav] = useState(false);
+  const [personalTab, setPersonalTab] = useState("dashboard");
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -114,10 +115,9 @@ export default function App() {
   const displayName = user.displayName || user.email?.split("@")[0] || "there";
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   const hideTopBar = view === "profile" || view === "budget" || view === "dashboard"
-    || view === "personal-dashboard" || view === "personal-summary"
-    || view === "shared-house" || view === "travel";
+    || view === "personal" || view === "shared-house" || view === "travel";
 
-  const personalViews = ["personal-dashboard", "personal-summary", "transactions", "paste"];
+  const personalViews = ["personal"];
 
   function navTo(key) { setView(key); setMobileNav(false); }
 
@@ -135,20 +135,8 @@ export default function App() {
         <button className={view === "budget" ? "active" : ""} onClick={() => navTo("budget")}>
           <span className="nav-icon"><IconBudget /></span><span>Budget</span>
         </button>
-        <button className={personalViews.includes(view) ? "active" : ""} onClick={() => navTo("personal-dashboard")}>
+        <button className={view === "personal" ? "active" : ""} onClick={() => navTo("personal")}>
           <span className="nav-icon"><IconTransactions /></span><span>Personal</span>
-        </button>
-        <button className={`nav-sub ${view === "personal-dashboard" ? "active" : ""}`} onClick={() => navTo("personal-dashboard")}>
-          <span className="nav-icon"><IconHome /></span><span>Dashboard</span>
-        </button>
-        <button className={`nav-sub ${view === "personal-summary" ? "active" : ""}`} onClick={() => navTo("personal-summary")}>
-          <span className="nav-icon"><IconYear /></span><span>Monthly Summary</span>
-        </button>
-        <button className={`nav-sub ${view === "transactions" ? "active" : ""}`} onClick={() => navTo("transactions")}>
-          <span className="nav-icon"><IconTransactions /></span><span>Transactions</span>
-        </button>
-        <button className={`nav-sub ${view === "paste" ? "active" : ""}`} onClick={() => navTo("paste")}>
-          <span className="nav-icon"><IconImport /></span><span>Bulk Import</span>
         </button>
         <button className={view === "shared-house" ? "active" : ""} onClick={() => navTo("shared-house")}>
           <span className="nav-icon"><IconHouse /></span>
@@ -229,52 +217,54 @@ export default function App() {
               <button className="btn primary" onClick={() => setModalOpen(true)}>
                 <IconPlus /> Add expense
               </button>
-              <button className="btn secondary" onClick={handleDeleteMonth}>
-                Delete month
-              </button>
             </div>
           </div>
         )}
 
         {error && error !== "config" && <div className="banner">Firestore error: {error}</div>}
 
-        {view === "dashboard"    && <Home tx={monthTx} others={monthOthers} house={monthHouse} grocery={monthGrocery} tuition={monthTuition} otherExpense={monthOtherExp} allTx={tx} allOthers={others} allHouse={house} allGrocery={grocery} allTuition={tuition} allOtherExpense={otherExpense} month={month} wallets={wallets} onView={setView} displayName={displayName} greeting={getGreeting()} today={today} onMonthChange={setMonth} months={months} />}
+        {view === "dashboard"    && <Home tx={monthTx} others={monthOthers} house={monthHouse} grocery={monthGrocery} tuition={monthTuition} otherExpense={monthOtherExp} allTx={tx} allOthers={others} allHouse={house} allGrocery={grocery} allTuition={tuition} allOtherExpense={otherExpense} month={month} wallets={wallets} onView={(v) => { if (["personal-dashboard","personal-summary","transactions","paste"].includes(v)) { const tabMap = {"personal-dashboard":"dashboard","personal-summary":"summary","transactions":"transactions","paste":"import"}; setPersonalTab(tabMap[v]||"dashboard"); setView("personal"); } else setView(v); }} displayName={displayName} greeting={getGreeting()} today={today} onMonthChange={setMonth} months={months} />}
         {view === "budget"       && <Budget wallets={wallets} onAdd={store.addWallet} onUpdate={store.updateWallet} onDelete={store.delWallet} />}
-        {view === "transactions" && <Transactions tx={monthTx} onDelete={store.delTx} others={monthOthers} onAddOther={handleAddOther} onDeleteOther={store.delOther} />}
-        {view === "paste"        && <BulkImport onImport={handleImport} />}
         {view === "year"         && <YearSummary tx={tx} others={others} />}
         {view === "profile"      && <Profile user={user} theme={theme} onThemeChange={setTheme} />}
 
-        {/* ── Personal views ── */}
-        {view === "personal-dashboard" && (
+        {/* ── Personal (tabbed) ── */}
+        {view === "personal" && (
           <div>
             <div className="top" style={{ marginBottom: 0 }}>
               <div className="greeting">
                 <div className="greeting-sub">{today}</div>
-                <h1>Personal — Dashboard</h1>
+                <h1>Personal</h1>
               </div>
               <div className="top-actions">
                 <select className="month-pill" value={month} onChange={(e) => setMonth(e.target.value)}>
                   {months.map((k) => <option key={k} value={k}>{monthLabel(k)}</option>)}
                 </select>
-                <button className="btn primary" onClick={() => setModalOpen(true)}>
-                  <IconPlus /> Add expense
+                {personalTab !== "import" && (
+                  <button className="btn primary" onClick={() => setModalOpen(true)}>
+                    <IconPlus /> Add expense
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="tab-bar">
+              {[
+                { key: "dashboard",    label: "Dashboard",       icon: <IconHome size={14}/> },
+                { key: "summary",      label: "Monthly Summary", icon: <IconYear size={14}/> },
+                { key: "transactions", label: "Transactions",    icon: <IconTransactions size={14}/> },
+                { key: "import",       label: "Bulk Import",     icon: <IconImport size={14}/> },
+              ].map(({ key, label, icon }) => (
+                <button key={key} className={`tab-btn${personalTab === key ? " active" : ""}`} onClick={() => setPersonalTab(key)}>
+                  {icon}<span>{label}</span>
                 </button>
-                <button className="btn secondary" onClick={handleDeleteMonth}>Delete month</button>
-              </div>
+              ))}
             </div>
-            <Dashboard tx={monthTx} others={monthOthers} onView={setView} onDelete={store.delTx} />
-          </div>
-        )}
-        {view === "personal-summary" && (
-          <div>
-            <div className="top" style={{ marginBottom: 0 }}>
-              <div className="greeting">
-                <div className="greeting-sub">{today}</div>
-                <h1>Personal — Monthly Summary</h1>
-              </div>
-            </div>
-            <YearSummary tx={tx} others={others} />
+
+            {personalTab === "dashboard"    && <Dashboard tx={monthTx} others={monthOthers} onView={(v) => { if (v === "transactions") setPersonalTab("transactions"); }} onDelete={store.delTx} />}
+            {personalTab === "summary"      && <YearSummary tx={tx} others={others} />}
+            {personalTab === "transactions" && <Transactions tx={monthTx} onDelete={store.delTx} others={monthOthers} onAddOther={handleAddOther} onDeleteOther={store.delOther} />}
+            {personalTab === "import"       && <BulkImport onImport={handleImport} />}
           </div>
         )}
 

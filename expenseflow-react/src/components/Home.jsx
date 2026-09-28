@@ -131,7 +131,7 @@ export default function Home({
           amount={personalTotal}
           prev={lastPersonal}
           sub={`${tx.length} transaction${tx.length !== 1 ? "s" : ""} · ${monthLabel(month, { month: "long" })}`}
-          onClick={() => onView("personal-dashboard")}
+          onClick={() => onView("personal")}
         />
         <SpendCard
           label="Shared expenses"
@@ -192,7 +192,7 @@ export default function Home({
           Quick access
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
-          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M4 7h4M4 10h2"/></svg>} title="Personal" sub="Dashboard & transactions" onClick={() => onView("personal-dashboard")} />
+          <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M4 7h4M4 10h2"/></svg>} title="Personal" sub="Dashboard & transactions" onClick={() => onView("personal")} />
           <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 7l7-5 7 5v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z"/><path d="M5.5 15V9h5v6"/></svg>} title="Shared House" sub="Split bills & expenses" onClick={() => onView("shared-house")} />
           <NavTile icon={<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 8a6 6 0 1 0 12 0A6 6 0 0 0 2 8z"/><path d="M8 5v3l2 1.5"/><path d="M2 3l2 1M12 3l-2 1"/></svg>} title="Travel" sub="Trips & group costs" onClick={() => onView("travel")} />
         </div>
