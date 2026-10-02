@@ -1,0 +1,31 @@
+rules_version = '2';
+
+// ExpenseFlow — Firebase Storage security rules
+//
+// Only authenticated users can read/write, and a user may only write to their
+// own avatar folder. Uploads are constrained to images under 2 MB to prevent
+// abuse. Everything else is denied by default.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Profile avatars: /avatars/{uid}/{file}
+    match /avatars/{uid}/{fileName} {
+      // Any signed-in user can view avatars (needed to render across shared
+      // houses / trips). Tighten to `request.auth.uid == uid` for private-only.
+      allow read: if request.auth != null;
+
+      allow write: if request.auth != null
+                   && request.auth.uid == uid
+                   && request.resource.size < 2 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Default deny for anything not matched above.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

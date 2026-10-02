@@ -4,6 +4,9 @@ import HouseDashboard from "./HouseDashboard";
 import { HouseBulkImport, HouseMonthlySummary } from "./HouseExpenses";
 import { monthLabel } from "../helpers";
 import { IconYear, IconImport, IconHome } from "./Icons";
+import ConfirmDialog from "./ConfirmDialog";
+import { useToast } from "./Toast";
+import MonthPicker from "./MonthPicker";
 
 // ── Member chip ───────────────────────────────────────────────────────────────
 function MemberChip({ email, isOwner, isPending, canRemove, onRemove }) {
@@ -82,7 +85,7 @@ function HouseSelector({ sharedHouses, selectedHouseId, onSelect, onCreate, user
               onClick={() => onSelect(h.id)}
             >
               <div>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>{h.name}</div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>{h.name}</div>
                 <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
                   {h.ownerEmail === userEmail ? "You own this" : `Shared by ${h.ownerEmail}`}
                   {" · "}
@@ -129,11 +132,14 @@ function MembersPanel({ house, isOwner, userEmail, onInvite, onRemove, onRename,
   const [busy,       setBusy]       = useState(false);
   const [migrating,  setMigrating]  = useState(false);
   const [clearing,   setClearing]   = useState(false);
-  const [msg,        setMsg]        = useState(null);
-  const [confirm,    setConfirm]    = useState(false);
-  const [renaming,   setRenaming]   = useState(false);
-  const [newName,    setNewName]    = useState(house.name);
-  const [savingName, setSavingName] = useState(false);
+  const [msg,         setMsg]         = useState(null);
+  const [confirmDel,  setConfirmDel]  = useState(false);
+  const [deleting,    setDeleting]    = useState(false);
+  const [confirmClear,setConfirmClear]= useState(false);
+  const [renaming,    setRenaming]    = useState(false);
+  const [newName,     setNewName]     = useState(house.name);
+  const [savingName,  setSavingName]  = useState(false);
+  const toast = useToast();
 
   async function handleInvite(e) {
     e.preventDefault();
@@ -158,9 +164,16 @@ function MembersPanel({ house, isOwner, userEmail, onInvite, onRemove, onRename,
   }
 
   async function handleDelete() {
-    if (!confirm) { setConfirm(true); return; }
-    try { await onDelete(house.id); }
-    catch (err) { alert("Failed: " + err.message); }
+    setDeleting(true);
+    try {
+      await onDelete(house.id);
+      toast.success(`"${house.name}" deleted.`);
+      // Parent unmounts this panel and returns to the house list after onDelete
+    } catch (err) {
+      toast.error("Delete failed: " + err.message);
+      setDeleting(false);
+      setConfirmDel(false);
+    }
   }
 
   async function handleRename(e) {
@@ -188,13 +201,15 @@ function MembersPanel({ house, isOwner, userEmail, onInvite, onRemove, onRename,
   }
 
   async function handleClear() {
-    if (!window.confirm(`Delete ALL data in "${house.name}"? This cannot be undone.`)) return;
+    setConfirmClear(false);
     setClearing(true); setMsg(null);
     try {
       const count = await onClear();
       setMsg({ type: "ok", text: `Cleared ${count} entries. You can now re-migrate cleanly.` });
+      toast.success(`Cleared ${count} entries.`);
     } catch (err) {
       setMsg({ type: "error", text: "Clear failed: " + err.message });
+      toast.error("Clear failed: " + err.message);
     } finally {
       setClearing(false);
     }
@@ -279,7 +294,7 @@ function MembersPanel({ house, isOwner, userEmail, onInvite, onRemove, onRename,
                 <button
                   className="btn secondary"
                   style={{ color: "var(--danger)", borderColor: "var(--danger)" }}
-                  onClick={handleClear}
+                  onClick={() => setConfirmClear(true)}
                   disabled={clearing}
                   title="Wipe all shared house data (use before re-migrating)"
                 >
@@ -292,19 +307,35 @@ function MembersPanel({ house, isOwner, userEmail, onInvite, onRemove, onRename,
           <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
             <button
               className="btn secondary"
-              style={{ color: confirm ? "var(--danger)" : undefined, borderColor: confirm ? "var(--danger)" : undefined }}
-              onClick={handleDelete}
+              style={{ color: "var(--danger)", borderColor: "var(--danger)" }}
+              onClick={() => setConfirmDel(true)}
+              disabled={deleting}
             >
-              <IconTrash size={13} /> {confirm ? "Confirm delete house" : "Delete shared house"}
+              <IconTrash size={13} /> {deleting ? "Deleting…" : "Delete shared house"}
             </button>
-            {confirm && (
-              <span style={{ fontSize: 12, color: "var(--muted)", marginLeft: 10 }}>
-                Click again to confirm — this cannot be undone.
-              </span>
-            )}
           </div>
         </>
       )}
+
+      <ConfirmDialog
+        open={confirmClear}
+        danger
+        title={`Clear all data in "${house.name}"?`}
+        message="This permanently removes every bill and grocery item in this shared house. Members will be kept. This cannot be undone."
+        confirmLabel="Clear data"
+        onConfirm={handleClear}
+        onCancel={() => setConfirmClear(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmDel}
+        danger
+        title={`Delete "${house.name}"?`}
+        message="This permanently deletes the shared house along with all its bills and grocery items for every member. This cannot be undone."
+        confirmLabel="Delete house"
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDel(false)}
+      />
     </div>
   );
 }
@@ -343,12 +374,14 @@ export default function SharedHouse({
   const monthHouse   = house.filter((x)   => x.month === month);
   const monthGrocery = grocery.filter((x) => x.month === month);
 
-  if (!selectedHouseId) {
+  // Show the house list when nothing is selected, or when the selected house
+  // is gone (e.g. just deleted) but the id hasn't cleared yet.
+  if (!selectedHouseId || !selectedHouse) {
     return (
       <HouseSelector
         sharedHouses={sharedHouses}
         selectedHouseId={selectedHouseId}
-        onSelect={setSelectedHouseId}
+        onSelect={(id) => { setSubView("dashboard"); setSelectedHouseId(id); }}
         onCreate={createSharedHouse}
         userEmail={userEmail}
       />
@@ -375,9 +408,7 @@ export default function SharedHouse({
           </h1>
         </div>
         <div className="top-actions">
-          <select className="month-pill" value={month} onChange={(e) => onMonthChange(e.target.value)}>
-            {sharedMonths.map((k) => <option key={k} value={k}>{monthLabel(k)}</option>)}
-          </select>
+          <MonthPicker value={month} onChange={onMonthChange} months={sharedMonths} />
         </div>
       </div>
 
@@ -434,6 +465,8 @@ export default function SharedHouse({
           onDelTuition={isOwner ? sharedHouseStore.deleteTuition : async () => {}}
           onAddOther={isOwner ? sharedHouseStore.addOtherExpense : async () => {}}
           onDelOther={isOwner ? sharedHouseStore.deleteOtherExpense : async () => {}}
+          customCats={selectedHouse?.customCategories || []}
+          onAddCategory={isOwner ? (name) => sharedHouseStore.addCategory(selectedHouse.id, name) : undefined}
         />
       )}
 

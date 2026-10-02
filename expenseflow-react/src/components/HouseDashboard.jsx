@@ -1,14 +1,17 @@
 import { useMemo, useState } from "react";
 import { money, monthLabel } from "../helpers";
-import { HOUSE_CATEGORIES, GROCERY_SUBCATS, HouseCatIcon, USAGE_CONFIG, effectiveHouseBycat, HOUSE_CAT_COLORS, normalizeCat } from "./HouseExpenses";
+import { HOUSE_CATEGORIES, GROCERY_SUBCATS, HouseCatIcon, USAGE_CONFIG, effectiveHouseBycat, HOUSE_CAT_COLORS, normalizeCat, houseCategoriesWith, houseCatColor } from "./HouseExpenses";
 import { IconTrash, IconEdit, IconPlus } from "./Icons";
 
 // Entry modal
-function EntryModal({ initial, month, onSave, onClose }) {
-  const [cat,   setCat]   = useState(initial?.cat    || HOUSE_CATEGORIES[0].key);
+function EntryModal({ initial, month, categories = HOUSE_CATEGORIES, onAddCategory, onSave, onClose }) {
+  const [cat,   setCat]   = useState(initial?.cat    || categories[0]?.key || HOUSE_CATEGORIES[0].key);
   const [amount,setAmount]= useState(initial?.amount != null ? String(initial.amount) : "");
   const [note,  setNote]  = useState(initial?.note   || "");
   const [usage, setUsage] = useState(initial?.usage  != null ? String(initial.usage) : "");
+  const [adding, setAdding] = useState(false);
+  const [draft,  setDraft]  = useState("");
+  const [busy,   setBusy]   = useState(false);
   const usageCfg = USAGE_CONFIG[cat];
   const S = { display:"block", width:"100%", marginTop:6, padding:"8px 10px", borderRadius:8, border:"1px solid var(--line)", fontSize:14, background:"var(--bg)", color:"var(--text)" };
   const L = { fontSize:12, fontWeight:600, color:"var(--muted)", textTransform:"uppercase", letterSpacing:.5 };
@@ -16,6 +19,15 @@ function EntryModal({ initial, month, onSave, onClose }) {
     e.preventDefault();
     if (!amount || isNaN(Number(amount))) return;
     onSave({ category:cat, amount:Number(amount), note, usage: usage ? Number(usage) : null, month });
+  }
+  async function confirmAdd() {
+    const name = draft.trim();
+    if (!name) { setAdding(false); return; }
+    const existing = categories.find((c) => c.key.toLowerCase() === name.toLowerCase());
+    if (existing) { setCat(existing.key); setAdding(false); setDraft(""); return; }
+    setBusy(true);
+    try { await onAddCategory?.(name); setCat(name); setDraft(""); setAdding(false); }
+    finally { setBusy(false); }
   }
   return (
     <div className="modal open" onClick={onClose}>
@@ -26,9 +38,20 @@ function EntryModal({ initial, month, onSave, onClose }) {
         </div>
         <form onSubmit={submit} style={{ display:"flex", flexDirection:"column", gap:12 }}>
           <label style={L}>Category
-            <select value={cat} onChange={(e) => { setCat(e.target.value); setUsage(""); }} style={S}>
-              {HOUSE_CATEGORIES.map(({ key }) => <option key={key} value={key}>{key}</option>)}
-            </select>
+            {adding ? (
+              <div style={{ display:"flex", gap:6, marginTop:6 }}>
+                <input autoFocus placeholder="New category" value={draft} onChange={(e)=>setDraft(e.target.value)}
+                  onKeyDown={(e)=>{ if(e.key==="Enter"){e.preventDefault();confirmAdd();} if(e.key==="Escape"){setAdding(false);setDraft("");} }}
+                  style={{ ...S, marginTop:0, flex:1 }}/>
+                <button type="button" className="btn primary" style={{ padding:"8px 12px" }} onClick={confirmAdd} disabled={busy}>{busy?"…":"Add"}</button>
+                <button type="button" className="btn secondary" style={{ padding:"8px 12px" }} onClick={()=>{setAdding(false);setDraft("");}}>✕</button>
+              </div>
+            ) : (
+              <select value={cat} onChange={(e) => { if(e.target.value==="__add__"){ setAdding(true); return; } setCat(e.target.value); setUsage(""); }} style={S}>
+                {categories.map(({ key }) => <option key={key} value={key}>{key}</option>)}
+                {onAddCategory && <option value="__add__">＋ Add new category…</option>}
+              </select>
+            )}
           </label>
           <label style={L}>Amount (PHP)
             <input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" required autoFocus style={S}/>
@@ -92,8 +115,11 @@ function DonutChart({ segments }) {
   );
 }
 
-export default function HouseDashboard({ house, grocery, tuition = [], otherExpense = [], month, onView, onAdd, onUpdate, onDelete, onAddGrocery, onDelGrocery, onAddTuition, onDelTuition, onAddOther, onDelOther, readOnly = false }) {
+export default function HouseDashboard({ house, grocery, tuition = [], otherExpense = [], month, onView, onAdd, onUpdate, onDelete, onAddGrocery, onDelGrocery, onAddTuition, onDelTuition, onAddOther, onDelOther, customCats = [], onAddCategory, readOnly = false }) {
   const [modal, setModal] = useState(null); // null | "add" | { ...entry }
+
+  // Merged category list (built-in + this house's custom ones)
+  const categories = useMemo(() => houseCategoriesWith(customCats), [customCats]);
 
   async function handleSave(data) {
     if (modal?.id) await onUpdate(modal.id, { cat: data.category, amount: data.amount, note: data.note, usage: data.usage ?? null, month: data.month, sharedDocId: modal.sharedDocId });
@@ -101,24 +127,24 @@ export default function HouseDashboard({ house, grocery, tuition = [], otherExpe
     setModal(null);
   }
   // Bills totals by category — Groceries/Market overridden by grocery items when present
-  const bycat = useMemo(() => effectiveHouseBycat(house, grocery, tuition, otherExpense), [house, grocery, tuition, otherExpense]);
+  const bycat = useMemo(() => effectiveHouseBycat(house, grocery, tuition, otherExpense, customCats), [house, grocery, tuition, otherExpense, customCats]);
 
   const houseTotal = useMemo(() => Object.values(bycat).reduce((s, v) => s + v, 0), [bycat]);
   const groceryTotal = grocery.reduce((s, x) => s + x.amount, 0);
   const grandTotal = houseTotal;
 
   // For donut — non-zero categories
-  const donutSegments = HOUSE_CATEGORIES
+  const donutSegments = categories
     .filter(({ key }) => bycat[key] > 0)
-    .map(({ key }) => ({ value: bycat[key], color: HOUSE_CAT_COLORS[key], label: key }));
+    .map(({ key }, i) => ({ value: bycat[key], color: houseCatColor(key, i), label: key }));
 
   // Grocery by subcat
   const groceryBySubcat = useMemo(() =>
     Object.fromEntries(GROCERY_SUBCATS.map((s) => [s, grocery.filter((x) => x.subcat === s).reduce((a, x) => a + x.amount, 0)])),
   [grocery]);
 
-  const maxCat = Math.max(...HOUSE_CATEGORIES.map(({ key }) => bycat[key]), 1);
-  const topBill = HOUSE_CATEGORIES.map(({ key, icon }) => ({ key, icon, amt: bycat[key] })).sort((a, b) => b.amt - a.amt)[0];
+  const maxCat = Math.max(...categories.map(({ key }) => bycat[key] || 0), 1);
+  const topBill = categories.map(({ key, icon }) => ({ key, icon, amt: bycat[key] || 0 })).sort((a, b) => b.amt - a.amt)[0];
 
   return (
     <>
@@ -182,10 +208,10 @@ export default function HouseDashboard({ house, grocery, tuition = [], otherExpe
           </div>
           {houseTotal > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
-              {HOUSE_CATEGORIES.map(({ key, icon }) => {
+              {categories.map(({ key, icon }, i) => {
                 const amt   = bycat[key] || 0;
                 const pct   = amt ? Math.max(4, Math.round((amt / maxCat) * 100)) : 0;
-                const color = HOUSE_CAT_COLORS[key];
+                const color = houseCatColor(key, i);
                 return (
                   <div key={key}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
@@ -267,7 +293,7 @@ export default function HouseDashboard({ house, grocery, tuition = [], otherExpe
         </div>
         {/* Category chips */}
         <div style={{ display:"flex", flexWrap:"wrap", gap:8, margin:"14px 0 10px" }}>
-          {HOUSE_CATEGORIES.map(({ key, icon }) => {
+          {categories.map(({ key, icon }) => {
             const amt = house.filter((x) => normalizeCat(x.cat)===key).reduce((s,x)=>s+x.amount,0);
             return (
               <div key={key} style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", borderRadius:20,
@@ -288,7 +314,7 @@ export default function HouseDashboard({ house, grocery, tuition = [], otherExpe
               <tbody>
                 {house.map((x) => {
                   const displayCat = normalizeCat(x.cat);
-                  const meta = HOUSE_CATEGORIES.find((c) => c.key===displayCat)||{};
+                  const meta = categories.find((c) => c.key===displayCat)||{ icon: "other" };
                   const uc = USAGE_CONFIG[displayCat];
                   return (
                     <tr key={x.id}>
@@ -448,6 +474,8 @@ export default function HouseDashboard({ house, grocery, tuition = [], otherExpe
         <EntryModal
           initial={modal === "add" ? null : modal}
           month={month}
+          categories={categories}
+          onAddCategory={onAddCategory}
           onSave={handleSave}
           onClose={() => setModal(null)}
         />

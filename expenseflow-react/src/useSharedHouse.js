@@ -146,6 +146,26 @@ export function useSharedHouse(uid, userEmail) {
     if (!newName?.trim()) throw new Error("Name cannot be empty.");
     await updateDoc(doc(db, SHARED_HOUSES, houseId), { name: newName.trim() });
   }, []);
+
+  // ── Custom categories (owner only) ───────────────────────────────────────
+  const addCategory = useCallback(async (houseId, name) => {
+    const clean = (name || "").trim();
+    if (!clean) return;
+    const ref = doc(db, SHARED_HOUSES, houseId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error("House not found");
+    const existing = snap.data().customCategories || [];
+    if (existing.some((c) => c.toLowerCase() === clean.toLowerCase())) return;
+    await updateDoc(ref, { customCategories: [...existing, clean] });
+  }, []);
+
+  const removeCategory = useCallback(async (houseId, name) => {
+    const ref = doc(db, SHARED_HOUSES, houseId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const existing = snap.data().customCategories || [];
+    await updateDoc(ref, { customCategories: existing.filter((c) => c !== name) });
+  }, []);
   const deleteSharedHouse = useCallback(async (houseId) => {
     // Delete all bills + grocery for this house
     const [billsSnap, grocSnap] = await Promise.all([
@@ -258,6 +278,7 @@ export function useSharedHouse(uid, userEmail) {
     selectedHouse, isOwner,
     house, grocery, tuition, otherExpense, loading, error,
     createSharedHouse, inviteMember, removeMember, renameSharedHouse, deleteSharedHouse,
+    addCategory, removeCategory,
     addBill, updateBill, deleteBill, importBills,
     addGrocery, deleteGrocery, importGrocery,
     addTuition, deleteTuition, addOtherExpense, deleteOtherExpense,

@@ -151,6 +151,27 @@ export function IconHouse({ size = 18 }) {
   );
 }
 
+export function IconLoan({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="4" width="14" height="10" rx="2" />
+      <circle cx="9" cy="9" r="2.2" />
+      <path d="M5 9h.01M13 9h.01" />
+    </svg>
+  );
+}
+
+export function IconDebt({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="6.5" cy="6" r="2.6" />
+      <path d="M1.5 15c0-2.5 2.2-4 5-4 1 0 1.9.2 2.7.6" />
+      <circle cx="13" cy="12.5" r="3.5" />
+      <path d="M13 11v3M11.5 12.5h3" />
+    </svg>
+  );
+}
+
 export function IconTravel({ size = 18 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">

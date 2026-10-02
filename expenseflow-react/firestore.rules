@@ -1,0 +1,215 @@
+rules_version = '2';
+
+// ExpenseFlow — Firestore security rules
+//
+// Model:
+//  - Personal collections carry a `uid` field = the owner's auth uid.
+//  - Shared collections (sharedHouse*, trip*) carry an `ownerUid` plus a
+//    `memberUids` array on the parent doc (sharedHouses / trips).
+//  - `userLookup/{uid}` maps a uid -> email so invites-by-email can resolve.
+//
+// Principles enforced below:
+//  - No anonymous access. Every request must be authenticated.
+//  - A user can only touch documents they own or are an explicit member of.
+//  - The `uid` / `ownerUid` on a document can never be spoofed or reassigned.
+//  - Basic shape/size validation to limit abuse and malformed writes.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwnerField(field) {
+      return signedIn() && request.resource.data[field] == request.auth.uid;
+    }
+
+    function ownsExisting(field) {
+      return signedIn() && resource.data[field] == request.auth.uid;
+    }
+
+    // Amount sanity: numeric and within a reasonable range.
+    function validAmount() {
+      return request.resource.data.amount is number
+        && request.resource.data.amount >= -100000000
+        && request.resource.data.amount <= 100000000;
+    }
+
+    // Ownership must never change on update.
+    function ownerUnchanged(field) {
+      return request.resource.data[field] == resource.data[field];
+    }
+
+    // ── Personal collections (scoped by `uid`) ──────────────────────────
+    match /transactions/{id} {
+      allow read, delete: if ownsExisting('uid');
+      allow create: if isOwnerField('uid') && validAmount();
+      allow update: if ownsExisting('uid') && isOwnerField('uid')
+                    && ownerUnchanged('uid') && validAmount();
+    }
+
+    match /others/{id} {
+      allow read, delete: if ownsExisting('uid');
+      allow create: if isOwnerField('uid') && validAmount();
+      allow update: if ownsExisting('uid') && ownerUnchanged('uid') && validAmount();
+    }
+
+    match /wallets/{id} {
+      allow read, delete: if ownsExisting('uid');
+      allow create: if isOwnerField('uid');
+      allow update: if ownsExisting('uid') && ownerUnchanged('uid');
+    }
+
+    // User-defined expense categories.
+    match /categories/{id} {
+      allow read, delete: if ownsExisting('uid');
+      allow create: if isOwnerField('uid')
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.name.size() <= 40;
+      allow update: if ownsExisting('uid') && ownerUnchanged('uid');
+    }
+
+    // Loans / installments (scoped by `uid`).
+    match /loans/{id} {
+      allow read, delete: if ownsExisting('uid');
+      allow create: if isOwnerField('uid')
+                    && request.resource.data.monthlyAmount is number
+                    && request.resource.data.termMonths is number;
+      allow update: if ownsExisting('uid') && ownerUnchanged('uid');
+    }
+
+    // Debts owed to me (people who borrowed from the user), scoped by `uid`.
+    match /debts/{id} {
+      allow read, delete: if ownsExisting('uid');
+      allow create: if isOwnerField('uid') && validAmount();
+      allow update: if ownsExisting('uid') && ownerUnchanged('uid') && validAmount();
+    }
+
+    match /house/{id} {
+      allow read, delete: if ownsExisting('uid');
+      allow create: if isOwnerField('uid') && validAmount();
+      allow update: if ownsExisting('uid') && ownerUnchanged('uid') && validAmount();
+    }
+
+    match /grocery/{id} {
+      allow read, delete: if ownsExisting('uid');
+      allow create: if isOwnerField('uid') && validAmount();
+      allow update: if ownsExisting('uid') && ownerUnchanged('uid') && validAmount();
+    }
+
+    match /tuition/{id} {
+      allow read, delete: if ownsExisting('uid');
+      allow create: if isOwnerField('uid') && validAmount();
+      allow update: if ownsExisting('uid') && ownerUnchanged('uid') && validAmount();
+    }
+
+    match /otherExpense/{id} {
+      allow read, delete: if ownsExisting('uid');
+      allow create: if isOwnerField('uid') && validAmount();
+      allow update: if ownsExisting('uid') && ownerUnchanged('uid') && validAmount();
+    }
+
+    // ── userLookup: a user may only write their own {uid} doc ───────────
+    // Readable by any signed-in user so invite-by-email can resolve a uid.
+    match /userLookup/{uid} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+                            && uid == request.auth.uid
+                            && request.resource.data.uid == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // ── Shared houses ────────────────────────────────────────────────────
+    function isHouseOwner(house) {
+      return signedIn() && house.data.ownerUid == request.auth.uid;
+    }
+    function isHouseMember(house) {
+      return signedIn()
+        && (house.data.ownerUid == request.auth.uid
+            || (house.data.memberUids != null
+                && request.auth.uid in house.data.memberUids));
+    }
+
+    match /sharedHouses/{houseId} {
+      allow read: if isHouseMember(resource);
+      allow create: if isOwnerField('ownerUid');
+      // Only the owner can change house settings/membership; ownerUid is locked.
+      allow update: if isHouseOwner(resource) && ownerUnchanged('ownerUid');
+      allow delete: if isHouseOwner(resource);
+    }
+
+    // Shared sub-collections: owner has full control; members read-only.
+    // ownerUid on each doc must match the caller for writes.
+    function sharedReadable() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/sharedHouses/$(request.resource.data.houseId));
+    }
+
+    match /sharedHouseBills/{id} {
+      allow read: if signedIn() && isHouseMember(
+        get(/databases/$(database)/documents/sharedHouses/$(resource.data.houseId)));
+      allow create: if isOwnerField('ownerUid') && validAmount() && isHouseOwner(
+        get(/databases/$(database)/documents/sharedHouses/$(request.resource.data.houseId)));
+      allow update, delete: if ownsExisting('ownerUid');
+    }
+
+    match /sharedHouseGrocery/{id} {
+      allow read: if signedIn() && isHouseMember(
+        get(/databases/$(database)/documents/sharedHouses/$(resource.data.houseId)));
+      allow create: if isOwnerField('ownerUid') && validAmount() && isHouseOwner(
+        get(/databases/$(database)/documents/sharedHouses/$(request.resource.data.houseId)));
+      allow update, delete: if ownsExisting('ownerUid');
+    }
+
+    match /sharedHouseTuition/{id} {
+      allow read: if signedIn() && isHouseMember(
+        get(/databases/$(database)/documents/sharedHouses/$(resource.data.houseId)));
+      allow create: if isOwnerField('ownerUid') && validAmount() && isHouseOwner(
+        get(/databases/$(database)/documents/sharedHouses/$(request.resource.data.houseId)));
+      allow update, delete: if ownsExisting('ownerUid');
+    }
+
+    match /sharedHouseOther/{id} {
+      allow read: if signedIn() && isHouseMember(
+        get(/databases/$(database)/documents/sharedHouses/$(resource.data.houseId)));
+      allow create: if isOwnerField('ownerUid') && validAmount() && isHouseOwner(
+        get(/databases/$(database)/documents/sharedHouses/$(request.resource.data.houseId)));
+      allow update, delete: if ownsExisting('ownerUid');
+    }
+
+    // ── Trips ────────────────────────────────────────────────────────────
+    function isTripMember(trip) {
+      return signedIn()
+        && (trip.data.ownerUid == request.auth.uid
+            || (trip.data.memberUids != null
+                && request.auth.uid in trip.data.memberUids));
+    }
+    function isTripOwner(trip) {
+      return signedIn() && trip.data.ownerUid == request.auth.uid;
+    }
+
+    match /trips/{tripId} {
+      allow read: if isTripMember(resource);
+      allow create: if isOwnerField('ownerUid');
+      allow update: if isTripOwner(resource) && ownerUnchanged('ownerUid');
+      allow delete: if isTripOwner(resource);
+    }
+
+    match /tripExpenses/{id} {
+      allow read: if signedIn() && isTripMember(
+        get(/databases/$(database)/documents/trips/$(resource.data.tripId)));
+      // Any trip member can log an expense; ownerUid records who created it.
+      allow create: if isOwnerField('ownerUid') && validAmount() && isTripMember(
+        get(/databases/$(database)/documents/trips/$(request.resource.data.tripId)));
+      allow update, delete: if ownsExisting('ownerUid');
+    }
+
+    // ── Default deny ─────────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

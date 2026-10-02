@@ -100,14 +100,33 @@ export const USAGE_CONFIG = {
  * with the sum of grocery items when any items exist for that month.
  * allHouse: all house bill entries, allGrocery: all grocery items, month: "YYYY-MM"
  */
-export function effectiveHouseBycat(houseEntries, groceryEntries, tuitionEntries = [], otherEntries = []) {
-  const bycat = Object.fromEntries(HOUSE_CATEGORIES.map(({ key }) => [key, 0]));
+// Fallback palette for custom (user-added) categories with no fixed color.
+const CUSTOM_CAT_PALETTE = ["#8b5cf6", "#06b6d4", "#f43f5e", "#84cc16", "#eab308", "#14b8a6", "#f97316", "#6366f1"];
+export function houseCatColor(key, index = 0) {
+  return HOUSE_CAT_COLORS[key] || CUSTOM_CAT_PALETTE[index % CUSTOM_CAT_PALETTE.length];
+}
+
+// Merge built-in house categories with a house's custom categories.
+export function houseCategoriesWith(customCats = []) {
+  const seen = new Map(HOUSE_CATEGORIES.map((c) => [c.key.toLowerCase(), c]));
+  for (const name of customCats) {
+    const clean = (typeof name === "string" ? name : name?.key || "").trim();
+    if (clean && !seen.has(clean.toLowerCase())) seen.set(clean.toLowerCase(), { key: clean, icon: "other" });
+  }
+  return [...seen.values()];
+}
+
+export function effectiveHouseBycat(houseEntries, groceryEntries, tuitionEntries = [], otherEntries = [], extraCats = []) {
+  const cats = houseCategoriesWith(extraCats);
+  const bycat = Object.fromEntries(cats.map(({ key }) => [key, 0]));
   houseEntries.forEach((x) => {
     // Map old key to new key for backwards compatibility
     const cat = x.cat === "Groceries/Market" ? "Food & Essentials"
               : x.cat === "Tuition"          ? "School Fees"
               : x.cat;
-    if (bycat[cat] !== undefined) bycat[cat] += x.amount;
+    // Include custom categories that aren't in the base map.
+    if (bycat[cat] === undefined) bycat[cat] = 0;
+    bycat[cat] += x.amount;
   });
   const groceryTotal  = groceryEntries.reduce((s, x) => s + x.amount, 0);
   const tuitionTotal  = tuitionEntries.reduce((s, x) => s + x.amount, 0);

@@ -3,22 +3,29 @@ import { useStore } from "./useStore";
 import { useAuth } from "./useAuth";
 import { useSharedHouse, registerUserLookup } from "./useSharedHouse";
 import { useTravel, resolveTravelInvites } from "./useTravel";
-import { monthLabel } from "./helpers";
+import { monthLabel, mergedCategories } from "./helpers";
 import Home          from "./components/Home";
 import Dashboard    from "./components/Dashboard";
 import Transactions from "./components/Transactions";
 import BulkImport   from "./components/BulkImport";
 import YearSummary  from "./components/YearSummary";
 import Budget       from "./components/Budget";
+import Loans        from "./components/Loans";
+import Debts        from "./components/Debts";
 import AddModal     from "./components/AddModal";
+import OtherModal   from "./components/OtherModal";
+import ConfirmDialog from "./components/ConfirmDialog";
+import { useToast } from "./components/Toast";
 import Login        from "./components/Login";
 import Profile      from "./components/Profile";
 import HouseExpenses, { HouseBulkImport, HouseMonthlySummary } from "./components/HouseExpenses";
 import HouseDashboard from "./components/HouseDashboard";import SharedHouse  from "./components/SharedHouse";
 import Travel        from "./components/Travel";
+import { applyAccent, DEFAULT_ACCENT } from "./accents";
+import MonthPicker from "./components/MonthPicker";
 import {
   IconHome, IconTransactions, IconYear,
-  IconImport, IconProfile, IconLogout, IconLeaf, IconPlus, IconBudget, IconHouse, IconTravel,
+  IconImport, IconProfile, IconLogout, IconLeaf, IconPlus, IconBudget, IconHouse, IconTravel, IconLoan, IconDebt,
 } from "./components/Icons";
 
 function getGreeting() {
@@ -30,6 +37,7 @@ function getGreeting() {
 
 export default function App() {
   const auth  = useAuth();
+  const toast = useToast();
   const { user, authLoading, logout } = auth;
   const sharedHouseStore = useSharedHouse(user?.uid, user?.email);
   const travelStore      = useTravel(user?.uid, user?.email);
@@ -50,19 +58,49 @@ export default function App() {
   }, [sharedHouseStore.selectedHouse, user?.uid]);
 
   const store = useStore(user?.uid, syncTarget);
-  const { tx, others, house, grocery, tuition, otherExpense, wallets, loading, error } = store;
+  const { tx, others, house, grocery, tuition, otherExpense, wallets, customCats, loading, error } = store;
+  const categoryList = useMemo(() => mergedCategories(customCats), [customCats]);
 
-  const [view,      setView]      = useState("dashboard");
+  const VALID_VIEWS = ["dashboard", "budget", "loans", "debts", "personal", "shared-house", "travel", "profile", "year"];
+  const [view,      setView]      = useState(() => {
+    const saved = localStorage.getItem("view");
+    return VALID_VIEWS.includes(saved) ? saved : "dashboard";
+  });
   const [month,     setMonth]     = useState("2026-08");
   const [modalOpen, setModalOpen] = useState(false);
+  const [otherOpen, setOtherOpen] = useState(false);
+  const [confirmMonth, setConfirmMonth] = useState(false);
   const [theme,     setTheme]     = useState(() => localStorage.getItem("theme") || "light");
+  const [accent,    setAccent]    = useState(() => localStorage.getItem("accent") || DEFAULT_ACCENT);
   const [mobileNav, setMobileNav] = useState(false);
-  const [personalTab, setPersonalTab] = useState("dashboard");
+  const [personalTab, setPersonalTab] = useState(() => localStorage.getItem("personalTab") || "dashboard");
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("theme", theme);
+    applyAccent(accent, theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem("accent", accent);
+    applyAccent(accent, theme);
+  }, [accent, theme]);
+
+  // Persist current view + personal tab so a refresh keeps the user in place
+  useEffect(() => { localStorage.setItem("view", view); }, [view]);
+  useEffect(() => { localStorage.setItem("personalTab", personalTab); }, [personalTab]);
+
+  // Global keyboard shortcut: press "n" to add an expense (ignored while typing)
+  useEffect(() => {
+    function onKey(e) {
+      const el = e.target;
+      const typing = el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
+      if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "n" || e.key === "N") { e.preventDefault(); setModalOpen(true); }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const months = useMemo(() => {
     const set = new Set([...tx, ...others, ...house, ...tuition, ...otherExpense].map((x) => x.month).filter(Boolean));
@@ -92,17 +130,25 @@ export default function App() {
   if (!user)       return <Login auth={auth} />;
   if (loading)     return <div className="loading">Loading your data…</div>;
 
-  async function handleAddOther() {
-    const desc = prompt("Description"); if (!desc) return;
-    const amount = Number(prompt("Amount (PHP)")); if (!amount) return;
-    await store.addOther({ desc, amount, month });
+  async function handleAddOther(data) {
+    await store.addOther({ ...data, month });
+    toast.success("Other expense added.");
   }
 
-  async function handleDeleteMonth() {
+  function requestDeleteMonth() {
     const count = monthTx.length + monthOthers.length;
-    if (!count) { alert(`No entries for ${monthLabel(month)}.`); return; }
-    if (!confirm(`Delete ALL ${count} entries for ${monthLabel(month)}? This cannot be undone.`)) return;
-    try { await store.deleteMonth(month); } catch (e) { alert("Delete failed: " + e.message); }
+    if (!count) { toast.info(`No entries for ${monthLabel(month)}.`); return; }
+    setConfirmMonth(true);
+  }
+
+  async function confirmDeleteMonth() {
+    setConfirmMonth(false);
+    try {
+      const n = await store.deleteMonth(month);
+      toast.success(`Deleted ${n} entr${n === 1 ? "y" : "ies"} for ${monthLabel(month)}.`);
+    } catch (e) {
+      toast.error("Delete failed: " + e.message);
+    }
   }
 
   async function handleImport(txRows, otherRows) {
@@ -115,7 +161,7 @@ export default function App() {
   const displayName = user.displayName || user.email?.split("@")[0] || "there";
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   const hideTopBar = view === "profile" || view === "budget" || view === "dashboard"
-    || view === "personal" || view === "shared-house" || view === "travel";
+    || view === "personal" || view === "shared-house" || view === "travel" || view === "loans" || view === "debts";
 
   const personalViews = ["personal"];
 
@@ -134,6 +180,24 @@ export default function App() {
         </button>
         <button className={view === "budget" ? "active" : ""} onClick={() => navTo("budget")}>
           <span className="nav-icon"><IconBudget /></span><span>Budget</span>
+        </button>
+        <button className={view === "loans" ? "active" : ""} onClick={() => navTo("loans")}>
+          <span className="nav-icon"><IconLoan /></span>
+          <span>Loans</span>
+          {store.loans?.length > 0 && (
+            <span style={{ marginLeft: "auto", background: "var(--accent)", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px", fontWeight: 700 }}>
+              {store.loans.length}
+            </span>
+          )}
+        </button>
+        <button className={view === "debts" ? "active" : ""} onClick={() => navTo("debts")}>
+          <span className="nav-icon"><IconDebt /></span>
+          <span>Owed to Me</span>
+          {store.debts?.length > 0 && (
+            <span style={{ marginLeft: "auto", background: "var(--accent)", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px", fontWeight: 700 }}>
+              {store.debts.length}
+            </span>
+          )}
         </button>
         <button className={view === "personal" ? "active" : ""} onClick={() => navTo("personal")}>
           <span className="nav-icon"><IconTransactions /></span><span>Personal</span>
@@ -211,9 +275,7 @@ export default function App() {
               <h1>{getGreeting()}, {displayName}!</h1>
             </div>
             <div className="top-actions">
-              <select className="month-pill" value={month} onChange={(e) => setMonth(e.target.value)}>
-                {months.map((k) => <option key={k} value={k}>{monthLabel(k)}</option>)}
-              </select>
+              <MonthPicker value={month} onChange={setMonth} months={months} />
               <button className="btn primary" onClick={() => setModalOpen(true)}>
                 <IconPlus /> Add expense
               </button>
@@ -225,8 +287,10 @@ export default function App() {
 
         {view === "dashboard"    && <Home tx={monthTx} others={monthOthers} house={monthHouse} grocery={monthGrocery} tuition={monthTuition} otherExpense={monthOtherExp} allTx={tx} allOthers={others} allHouse={house} allGrocery={grocery} allTuition={tuition} allOtherExpense={otherExpense} month={month} wallets={wallets} onView={(v) => { if (["personal-dashboard","personal-summary","transactions","paste"].includes(v)) { const tabMap = {"personal-dashboard":"dashboard","personal-summary":"summary","transactions":"transactions","paste":"import"}; setPersonalTab(tabMap[v]||"dashboard"); setView("personal"); } else setView(v); }} displayName={displayName} greeting={getGreeting()} today={today} onMonthChange={setMonth} months={months} />}
         {view === "budget"       && <Budget wallets={wallets} onAdd={store.addWallet} onUpdate={store.updateWallet} onDelete={store.delWallet} />}
+        {view === "loans"        && <Loans loans={store.loans} onAdd={store.addLoan} onUpdate={store.updateLoan} onDelete={store.delLoan} />}
+        {view === "debts"        && <Debts debts={store.debts} onAdd={store.addDebt} onUpdate={store.updateDebt} onDelete={store.delDebt} />}
         {view === "year"         && <YearSummary tx={tx} others={others} />}
-        {view === "profile"      && <Profile user={user} theme={theme} onThemeChange={setTheme} />}
+        {view === "profile"      && <Profile user={user} theme={theme} onThemeChange={setTheme} accent={accent} onAccentChange={setAccent} />}
 
         {/* ── Personal (tabbed) ── */}
         {view === "personal" && (
@@ -237,9 +301,7 @@ export default function App() {
                 <h1>Personal</h1>
               </div>
               <div className="top-actions">
-                <select className="month-pill" value={month} onChange={(e) => setMonth(e.target.value)}>
-                  {months.map((k) => <option key={k} value={k}>{monthLabel(k)}</option>)}
-                </select>
+                <MonthPicker value={month} onChange={setMonth} months={months} />
                 {personalTab !== "import" && (
                   <button className="btn primary" onClick={() => setModalOpen(true)}>
                     <IconPlus /> Add expense
@@ -263,7 +325,7 @@ export default function App() {
 
             {personalTab === "dashboard"    && <Dashboard tx={monthTx} others={monthOthers} onView={(v) => { if (v === "transactions") setPersonalTab("transactions"); }} onDelete={store.delTx} />}
             {personalTab === "summary"      && <YearSummary tx={tx} others={others} />}
-            {personalTab === "transactions" && <Transactions tx={monthTx} onDelete={store.delTx} others={monthOthers} onAddOther={handleAddOther} onDeleteOther={store.delOther} />}
+            {personalTab === "transactions" && <Transactions tx={monthTx} onDelete={store.delTx} others={monthOthers} onAddOther={() => setOtherOpen(true)} onDeleteOther={store.delOther} month={month} categories={categoryList} />}
             {personalTab === "import"       && <BulkImport onImport={handleImport} />}
           </div>
         )}
@@ -299,8 +361,28 @@ export default function App() {
       <AddModal
         open={modalOpen}
         month={month}
+        categories={categoryList}
+        onAddCategory={store.addCategory}
         onClose={() => setModalOpen(false)}
-        onSave={async (d) => { await store.addTx(d); setMonth(d.date.slice(0, 7)); }}
+        onSave={async (d) => { await store.addTx(d); setMonth(d.date.slice(0, 7)); toast.success("Expense added."); }}
+      />
+
+      <OtherModal
+        open={otherOpen}
+        categories={categoryList}
+        onAddCategory={store.addCategory}
+        onClose={() => setOtherOpen(false)}
+        onSave={handleAddOther}
+      />
+
+      <ConfirmDialog
+        open={confirmMonth}
+        danger
+        title={`Delete all entries for ${monthLabel(month)}?`}
+        message={`This will permanently remove ${monthTx.length + monthOthers.length} entr${(monthTx.length + monthOthers.length) === 1 ? "y" : "ies"}. This cannot be undone.`}
+        confirmLabel="Delete all"
+        onConfirm={confirmDeleteMonth}
+        onCancel={() => setConfirmMonth(false)}
       />
     </div>
   );

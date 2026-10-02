@@ -17,6 +17,9 @@ import { cat } from "./helpers";
 const TX = "transactions";
 const OTHERS = "others";
 const WALLETS = "wallets";
+const CATEGORIES_COL = "categories";
+const LOANS = "loans";
+const DEBTS = "debts";
 const HOUSE = "house";
 const GROCERY = "grocery";
 const S_BILLS   = "sharedHouseBills";
@@ -31,6 +34,9 @@ export function useStore(uid, syncTarget = null) {
   const [tx, setTx] = useState([]);
   const [others, setOthers] = useState([]);
   const [wallets, setWallets] = useState([]);
+  const [customCats, setCustomCats] = useState([]);
+  const [loans, setLoans] = useState([]);
+  const [debts, setDebts] = useState([]);
   const [house, setHouse] = useState([]);
   const [grocery, setGrocery] = useState([]);
   const [tuition, setTuition] = useState([]);
@@ -47,6 +53,9 @@ export function useStore(uid, syncTarget = null) {
     const txQuery      = query(collection(db, TX),      where("uid", "==", uid));
     const othersQuery  = query(collection(db, OTHERS),  where("uid", "==", uid));
     const walletsQuery = query(collection(db, WALLETS), where("uid", "==", uid));
+    const catsQuery    = query(collection(db, CATEGORIES_COL), where("uid", "==", uid));
+    const loansQuery   = query(collection(db, LOANS), where("uid", "==", uid));
+    const debtsQuery   = query(collection(db, DEBTS), where("uid", "==", uid));
     const houseQuery   = query(collection(db, HOUSE),    where("uid", "==", uid));
     const groceryQuery = query(collection(db, GROCERY),  where("uid", "==", uid));
     const tuitionQuery = query(collection(db, TUITION),  where("uid", "==", uid));
@@ -59,12 +68,15 @@ export function useStore(uid, syncTarget = null) {
 
     const unsubOthers  = onSnapshot(othersQuery,  (s) => setOthers(s.docs.map((d)  => ({ id: d.id, ...d.data() }))));
     const unsubWallets = onSnapshot(walletsQuery, (s) => setWallets(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const unsubCats    = onSnapshot(catsQuery,    (s) => setCustomCats(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const unsubLoans   = onSnapshot(loansQuery,   (s) => setLoans(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const unsubDebts   = onSnapshot(debtsQuery,   (s) => setDebts(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
     const unsubHouse   = onSnapshot(houseQuery,    (s) => setHouse(s.docs.map((d)        => ({ id: d.id, ...d.data() }))));
     const unsubGrocery = onSnapshot(groceryQuery,  (s) => setGrocery(s.docs.map((d)      => ({ id: d.id, ...d.data() }))));
     const unsubTuition = onSnapshot(tuitionQuery,  (s) => setTuition(s.docs.map((d)      => ({ id: d.id, ...d.data() }))));
     const unsubOtherExp= onSnapshot(otherExpQuery, (s) => setOtherExpense(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
 
-    return () => { unsubTx(); unsubOthers(); unsubWallets(); unsubHouse(); unsubGrocery(); unsubTuition(); unsubOtherExp(); };
+    return () => { unsubTx(); unsubOthers(); unsubWallets(); unsubCats(); unsubLoans(); unsubDebts(); unsubHouse(); unsubGrocery(); unsubTuition(); unsubOtherExp(); };
   }, [uid]);
 
   const addTx = useCallback(async ({ date, amount, desc, category }) => {
@@ -196,6 +208,69 @@ export function useStore(uid, syncTarget = null) {
 
   const delWallet = useCallback((id) => deleteDoc(doc(db, WALLETS, id)), []);
 
+  // Custom personal categories
+  const addCategory = useCallback(async (name) => {
+    const clean = (name || "").trim();
+    if (!clean) return;
+    await addDoc(collection(db, CATEGORIES_COL), { name: clean, uid });
+  }, [uid]);
+
+  const delCategory = useCallback((id) => deleteDoc(doc(db, CATEGORIES_COL, id)), []);
+
+  // Loans / installments
+  const addLoan = useCallback(async (data) => {
+    await addDoc(collection(db, LOANS), {
+      name: data.name,
+      lender: data.lender || "",
+      principal: Number(data.principal) || 0,
+      monthlyAmount: Number(data.monthlyAmount) || 0,
+      termMonths: Number(data.termMonths) || 0,
+      startMonth: data.startMonth,          // "YYYY-MM"
+      note: data.note || "",
+      uid,
+    });
+  }, [uid]);
+
+  const updateLoan = useCallback(async (id, data) => {
+    await updateDoc(doc(db, LOANS, id), {
+      name: data.name,
+      lender: data.lender || "",
+      principal: Number(data.principal) || 0,
+      monthlyAmount: Number(data.monthlyAmount) || 0,
+      termMonths: Number(data.termMonths) || 0,
+      startMonth: data.startMonth,
+      note: data.note || "",
+    });
+  }, []);
+
+  const delLoan = useCallback((id) => deleteDoc(doc(db, LOANS, id)), []);
+
+  // Debts owed to me (people who borrowed from me)
+  const addDebt = useCallback(async (data) => {
+    await addDoc(collection(db, DEBTS), {
+      person: data.person,
+      amount: Number(data.amount) || 0,
+      paidAmount: Number(data.paidAmount) || 0,
+      date: data.date,                 // "YYYY-MM-DD" when lent
+      dueDate: data.dueDate || "",     // optional "YYYY-MM-DD"
+      note: data.note || "",
+      uid,
+    });
+  }, [uid]);
+
+  const updateDebt = useCallback(async (id, data) => {
+    await updateDoc(doc(db, DEBTS, id), {
+      person: data.person,
+      amount: Number(data.amount) || 0,
+      paidAmount: Number(data.paidAmount) || 0,
+      date: data.date,
+      dueDate: data.dueDate || "",
+      note: data.note || "",
+    });
+  }, []);
+
+  const delDebt = useCallback((id) => deleteDoc(doc(db, DEBTS, id)), []);
+
   const delTx    = useCallback((id) => deleteDoc(doc(db, TX, id)),     []);
   const delOther = useCallback((id) => deleteDoc(doc(db, OTHERS, id)), []);
 
@@ -213,5 +288,5 @@ export function useStore(uid, syncTarget = null) {
     return docs.length;
   }, [uid]);
 
-  return { tx, others, house, grocery, tuition, otherExpense, wallets, loading, error, addTx, importMany, addOther, delTx, delOther, deleteMonth, addWallet, updateWallet, delWallet, addHouse, updateHouse, delHouse, importManyHouse, addGrocery, delGrocery, importManyGrocery, addTuition, delTuition, addOtherExpense, delOtherExpense };
+  return { tx, others, house, grocery, tuition, otherExpense, wallets, customCats, loans, debts, loading, error, addTx, importMany, addOther, delTx, delOther, deleteMonth, addWallet, updateWallet, delWallet, addCategory, delCategory, addLoan, updateLoan, delLoan, addDebt, updateDebt, delDebt, addHouse, updateHouse, delHouse, importManyHouse, addGrocery, delGrocery, importManyGrocery, addTuition, delTuition, addOtherExpense, delOtherExpense };
 }

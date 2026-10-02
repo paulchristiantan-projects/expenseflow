@@ -1,15 +1,32 @@
 import { useState } from "react";
 import TxTable from "./TxTable";
-import { CATEGORIES, byDateDesc, money } from "../helpers";
-import { IconTrash } from "./Icons";
+import { useToast } from "./Toast";
+import { CATEGORIES, byDateDesc, money, toCSV, downloadFile } from "../helpers";
+import { IconImport } from "./Icons";
 
-export default function Transactions({ tx, onDelete, others, onAddOther, onDeleteOther }) {
+export default function Transactions({ tx, onDelete, others, onAddOther, onDeleteOther, month, categories = CATEGORIES }) {
   const [q, setQ] = useState("");
   const [c, setC] = useState("");
+  const toast = useToast();
 
   const rows = byDateDesc(tx).filter(
     (x) => (!q || x.desc.toLowerCase().includes(q.toLowerCase())) && (!c || x.cat === c)
   );
+
+  function exportCsv() {
+    if (!rows.length) { toast.info("Nothing to export."); return; }
+    const csv = toCSV(
+      [
+        { key: "date", label: "Date" },
+        { key: "desc", label: "Description" },
+        { key: "cat", label: "Category" },
+        { key: "amount", label: "Amount" },
+      ],
+      rows,
+    );
+    downloadFile(`transactions-${month || "export"}.csv`, csv);
+    toast.success(`Exported ${rows.length} transactions.`);
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -94,7 +111,12 @@ export default function Transactions({ tx, onDelete, others, onAddOther, onDelet
       <div className="card tablecard">
         <div className="section-header">
           <h2>Transactions</h2>
-          <span className="badge">{tx.length} records</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span className="badge">{rows.length} of {tx.length}</span>
+            <button className="btn secondary" style={{ fontSize: 12, padding: "7px 12px" }} onClick={exportCsv}>
+              <IconImport size={14} /> Export CSV
+            </button>
+          </div>
         </div>
         <div className="filters">
           <input
@@ -104,7 +126,7 @@ export default function Transactions({ tx, onDelete, others, onAddOther, onDelet
           />
           <select value={c} onChange={(e) => setC(e.target.value)}>
             <option value="">All categories</option>
-            {CATEGORIES.filter((x) => x !== "House Payment").map((x) => (
+            {categories.filter((x) => x !== "House Payment").map((x) => (
               <option key={x}>{x}</option>
             ))}
           </select>

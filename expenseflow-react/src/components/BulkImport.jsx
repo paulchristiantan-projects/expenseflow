@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { parseBulk } from "../parseBulk";
+import { useToast } from "./Toast";
 
 // Offer a range of years to default to when a date header omits the year.
 const YEAR_OPTIONS = (() => {
@@ -13,23 +14,31 @@ export default function BulkImport({ onImport }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [year, setYear] = useState(new Date().getFullYear());
+  const [result, setResult] = useState(null); // { type: "ok" | "error", text }
+  const toast = useToast();
 
   async function handleImport() {
+    setResult(null);
     const { tx, others } = parseBulk(text, Number(year));
     if (!tx.length && !others.length) {
-      alert("No transactions detected. Check the format.");
+      setResult({ type: "error", text: "No transactions detected. Check the format and try again." });
+      toast.error("No transactions detected.");
       return;
     }
     setBusy(true);
     try {
       await onImport(tx, others);
       const parts = [];
-      if (tx.length) parts.push(`${tx.length} transactions`);
-      if (others.length) parts.push(`${others.length} other expenses`);
-      alert(`Imported ${parts.join(" and ")}.`);
+      if (tx.length) parts.push(`${tx.length} transaction${tx.length !== 1 ? "s" : ""}`);
+      if (others.length) parts.push(`${others.length} other expense${others.length !== 1 ? "s" : ""}`);
+      const summary = `Imported ${parts.join(" and ")}.`;
+      setResult({ type: "ok", text: summary });
+      toast.success(summary);
       setText("");
     } catch (e) {
-      alert("Import failed: " + e.message);
+      const errText = "Import failed: " + e.message;
+      setResult({ type: "error", text: errText });
+      toast.error(errText);
     } finally {
       setBusy(false);
     }
@@ -55,6 +64,11 @@ export default function BulkImport({ onImport }) {
           </button>
         </div>
       </div>
+      {result && (
+        <div className={result.type === "ok" ? "notice" : "banner"} style={{ marginTop: 12 }}>
+          {result.text}
+        </div>
+      )}
       <p style={{ color: "var(--muted)", fontSize: 13 }}>
         Paste your original format. The app detects dates and lines like{" "}
         <b>260 - Mototaxi</b>. Lines beginning with “Total:” are ignored because the app
