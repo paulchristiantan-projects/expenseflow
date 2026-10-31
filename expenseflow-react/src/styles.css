@@ -186,11 +186,13 @@ body {
   display: none;
   position: fixed;
   top: 0; left: 0; right: 0;
-  height: 54px;
+  height: calc(54px + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
   background: var(--sidebar);
   border-bottom: 1px solid var(--line);
   z-index: 500;
-  padding: 0 12px;
+  padding-left: 12px;
+  padding-right: 12px;
   align-items: center;
   justify-content: space-between;
   box-shadow: var(--shadow);
@@ -228,7 +230,7 @@ body {
   border-right: 1px solid var(--line);
   box-shadow: var(--shadow-md);
   z-index: 600;
-  padding: 20px 14px;
+  padding: calc(20px + env(safe-area-inset-top)) 14px calc(20px + env(safe-area-inset-bottom));
   flex-direction: column;
   overflow-y: auto;
   transform: translateX(-100%);
@@ -626,7 +628,10 @@ details.month-breakdown-row.empty-month:not([open]) .mbl-month::after { content:
     margin-left: 0;
     width: 100%;
     padding: 16px 14px;
-    padding-top: calc(54px + 16px);
+    padding-top: calc(54px + 16px + env(safe-area-inset-top));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    padding-left: calc(14px + env(safe-area-inset-left));
+    padding-right: calc(14px + env(safe-area-inset-right));
   }
   .grid         { grid-template-columns: 1fr 1fr; }
   .formgrid     { grid-template-columns: 1fr; }
@@ -908,4 +913,64 @@ details.month-breakdown-row.empty-month:not([open]) .mbl-month::after { content:
   .login-page { grid-template-columns: 1fr; }
   .login-brand-panel { display: none; }
   .login-logo-mobile { display: flex; }
+}
+
+/* ── Salary progression ── */
+.salary-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 20px; gap: 12px; flex-wrap: wrap;
+}
+.salary-kpis { grid-template-columns: repeat(4, 1fr); }
+
+.salary-row {
+  display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+}
+.salary-row-main { flex: 1; min-width: 0; }
+.salary-row-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Tablet: 2-up KPIs */
+@media (max-width: 900px) {
+  .salary-kpis { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Mobile: stack the row so nothing gets cramped or clipped */
+@media (max-width: 600px) {
+  .salary-add-btn { width: 100%; justify-content: center; }
+
+  .salary-row {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 14px;
+  }
+  /* Line 1: icon on the left, action buttons on the right */
+  .salary-row-icon   { order: 1; }
+  .salary-row-actions {
+    order: 2;
+    margin-left: auto;
+  }
+  .salary-row-actions .tx-delete-btn { padding: 8px; } /* larger tap targets */
+
+  /* Line 2: main content spans the full width so text never cramps */
+  .salary-row-main {
+    order: 3;
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+  .salary-row-meta { white-space: normal; }
+
+  /* Line 3: growth figures full width, left-aligned */
+  .salary-row-growth {
+    order: 4;
+    flex: 1 1 100%;
+    width: 100%;
+    text-align: left !important;
+    display: flex; align-items: center; gap: 8px;
+    padding-top: 2px; border-top: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 380px) {
+  .salary-kpis { grid-template-columns: 1fr; }
 }

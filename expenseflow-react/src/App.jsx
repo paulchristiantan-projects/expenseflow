@@ -216,6 +216,9 @@ export default function App() {
             </span>
           )}
         </button>
+        <button className={view === "personal" ? "active" : ""} onClick={() => navTo("personal")}>
+          <span className="nav-icon"><IconTransactions /></span><span>Personal</span>
+        </button>
         <button className={view === "salary" ? "active" : ""} onClick={() => navTo("salary")}>
           <span className="nav-icon"><IconSalary /></span>
           <span>Salary</span>
@@ -224,9 +227,6 @@ export default function App() {
               {store.salaries.length}
             </span>
           )}
-        </button>
-        <button className={view === "personal" ? "active" : ""} onClick={() => navTo("personal")}>
-          <span className="nav-icon"><IconTransactions /></span><span>Personal</span>
         </button>
         <button className={view === "shared-house" ? "active" : ""} onClick={() => navTo("shared-house")}>
           <span className="nav-icon"><IconHouse /></span>

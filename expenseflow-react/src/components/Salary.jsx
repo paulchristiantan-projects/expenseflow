@@ -260,11 +260,11 @@ function dateLabel(iso) {
 function SalaryRow({ entry, isLatest, onEdit, onDelete }) {
   const freqLabel = (FREQUENCIES.find((f) => f.value === entry.frequency) || {}).label || "Monthly";
   return (
-    <div className="card" style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px" }}>
-      <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--accent-bg)", color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+    <div className="card salary-row">
+      <div className="salary-row-icon" style={{ width: 40, height: 40, borderRadius: 10, background: "var(--accent-bg)", color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         <IconSalary />
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="salary-row-main" style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontWeight: 800, fontSize: 16 }}>{money(entry.amount)}</span>
           <span style={{ fontSize: 12, color: "var(--muted)" }}>/ {freqLabel.toLowerCase()}</span>
@@ -275,7 +275,7 @@ function SalaryRow({ entry, isLatest, onEdit, onDelete }) {
           )}
           {isLatest && <span style={{ fontSize: 10, fontWeight: 700, color: "var(--accent)", background: "var(--accent-bg)", padding: "2px 7px", borderRadius: 20 }}>CURRENT</span>}
         </div>
-        <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div className="salary-row-meta" style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
           {dateLabel(entry.effectiveDate)}
           {entry.changeType && ` · ${entry.changeType}`}
           {entry.title && ` · ${entry.title}`}
@@ -301,7 +301,7 @@ function SalaryRow({ entry, isLatest, onEdit, onDelete }) {
         )}
         {entry.note && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2, fontStyle: "italic" }}>{entry.note}</div>}
       </div>
-      <div style={{ textAlign: "right", flexShrink: 0 }}>
+      <div className="salary-row-growth" style={{ textAlign: "right", flexShrink: 0 }}>
         <GrowthPill pct={entry.growthPct} />
         {entry.growthAmount != null && entry.growthAmount !== 0 && (
           <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
@@ -309,7 +309,7 @@ function SalaryRow({ entry, isLatest, onEdit, onDelete }) {
           </div>
         )}
       </div>
-      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+      <div className="salary-row-actions" style={{ display: "flex", gap: 4, flexShrink: 0 }}>
         <button className="tx-delete-btn" title="Edit" onClick={() => onEdit(entry)}><IconEdit size={15} /></button>
         <button className="tx-delete-btn" title="Delete" onClick={() => onDelete(entry)}><IconTrash size={15} /></button>
       </div>
@@ -363,18 +363,18 @@ export default function Salary({ salaries, onAdd, onUpdate, onDelete }) {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, gap: 12, flexWrap: "wrap" }}>
+      <div className="salary-header">
         <div>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Salary Progression</h2>
           <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: 13 }}>
             Log every pay change with its effective date and watch your income grow over time.
           </p>
         </div>
-        <button className="btn primary" onClick={openAdd}><IconPlus /> Add entry</button>
+        <button className="btn primary salary-add-btn" onClick={openAdd}><IconPlus /> Add entry</button>
       </div>
 
       {stats && (
-        <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 18 }}>
+        <div className="grid salary-kpis" style={{ marginBottom: 18 }}>
           <div className="card kpi">
             <div className="label">Basic + Allowance (monthly)</div>
             <div className="value" style={{ fontSize: 20 }}>

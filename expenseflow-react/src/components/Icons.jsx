@@ -179,3 +179,14 @@ export function IconTravel({ size = 18 }) {
     </svg>
   );
 }
+
+export function IconSalary({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 13.5V7l6-4 6 4v6.5" />
+      <path d="M9 11.5c1 0 1.8-.5 1.8-1.3S10 9 9 9s-1.8-.4-1.8-1.2S8 6.5 9 6.5" />
+      <path d="M9 6v.5M9 11.5v.6" />
+      <path d="M2 15.5h14" />
+    </svg>
+  );
+}
