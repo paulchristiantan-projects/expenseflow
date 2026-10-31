@@ -12,6 +12,7 @@ import YearSummary  from "./components/YearSummary";
 import Budget       from "./components/Budget";
 import Loans        from "./components/Loans";
 import Debts        from "./components/Debts";
+import Salary       from "./components/Salary";
 import AddModal     from "./components/AddModal";
 import OtherModal   from "./components/OtherModal";
 import ConfirmDialog from "./components/ConfirmDialog";
@@ -25,7 +26,7 @@ import { applyAccent, DEFAULT_ACCENT } from "./accents";
 import MonthPicker from "./components/MonthPicker";
 import {
   IconHome, IconTransactions, IconYear,
-  IconImport, IconProfile, IconLogout, IconLeaf, IconPlus, IconBudget, IconHouse, IconTravel, IconLoan, IconDebt,
+  IconImport, IconProfile, IconLogout, IconLeaf, IconPlus, IconBudget, IconHouse, IconTravel, IconLoan, IconDebt, IconSalary,
 } from "./components/Icons";
 
 function getGreeting() {
@@ -61,7 +62,7 @@ export default function App() {
   const { tx, others, house, grocery, tuition, otherExpense, wallets, customCats, loading, error } = store;
   const categoryList = useMemo(() => mergedCategories(customCats), [customCats]);
 
-  const VALID_VIEWS = ["dashboard", "budget", "loans", "debts", "personal", "shared-house", "travel", "profile", "year"];
+  const VALID_VIEWS = ["dashboard", "budget", "loans", "debts", "salary", "personal", "shared-house", "travel", "profile", "year"];
   const [view,      setView]      = useState(() => {
     const saved = localStorage.getItem("view");
     return VALID_VIEWS.includes(saved) ? saved : "dashboard";
@@ -115,6 +116,22 @@ export default function App() {
   const monthTuition = useMemo(() => tuition.filter((x) => x.month === month), [tuition, month]);
   const monthOtherExp= useMemo(() => otherExpense.filter((x) => x.month === month), [otherExpense, month]);
 
+  // Shared expenses summary across ALL shared houses for the selected month
+  const sharedMonthTotal = useMemo(() => {
+    const sum = (arr) => (arr || []).filter((x) => x.month === month).reduce((s, x) => s + (Number(x.amount) || 0), 0);
+    return sum(sharedHouseStore.allBills) + sum(sharedHouseStore.allGrocery)
+         + sum(sharedHouseStore.allTuition) + sum(sharedHouseStore.allOther);
+  }, [sharedHouseStore.allBills, sharedHouseStore.allGrocery, sharedHouseStore.allTuition, sharedHouseStore.allOther, month]);
+
+  const sharedPrevTotal = useMemo(() => {
+    const [y, m] = month.split("-").map(Number);
+    const d = new Date(y, m - 2, 1);
+    const prev = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const sum = (arr) => (arr || []).filter((x) => x.month === prev).reduce((s, x) => s + (Number(x.amount) || 0), 0);
+    return sum(sharedHouseStore.allBills) + sum(sharedHouseStore.allGrocery)
+         + sum(sharedHouseStore.allTuition) + sum(sharedHouseStore.allOther);
+  }, [sharedHouseStore.allBills, sharedHouseStore.allGrocery, sharedHouseStore.allTuition, sharedHouseStore.allOther, month]);
+
   if (error === "config") return (
     <div className="loading">
       <div style={{ maxWidth: 520 }}>
@@ -161,7 +178,7 @@ export default function App() {
   const displayName = user.displayName || user.email?.split("@")[0] || "there";
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   const hideTopBar = view === "profile" || view === "budget" || view === "dashboard"
-    || view === "personal" || view === "shared-house" || view === "travel" || view === "loans" || view === "debts";
+    || view === "personal" || view === "shared-house" || view === "travel" || view === "loans" || view === "debts" || view === "salary";
 
   const personalViews = ["personal"];
 
@@ -196,6 +213,15 @@ export default function App() {
           {store.debts?.length > 0 && (
             <span style={{ marginLeft: "auto", background: "var(--accent)", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px", fontWeight: 700 }}>
               {store.debts.length}
+            </span>
+          )}
+        </button>
+        <button className={view === "salary" ? "active" : ""} onClick={() => navTo("salary")}>
+          <span className="nav-icon"><IconSalary /></span>
+          <span>Salary</span>
+          {store.salaries?.length > 0 && (
+            <span style={{ marginLeft: "auto", background: "var(--accent)", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px", fontWeight: 700 }}>
+              {store.salaries.length}
             </span>
           )}
         </button>
@@ -285,10 +311,11 @@ export default function App() {
 
         {error && error !== "config" && <div className="banner">Firestore error: {error}</div>}
 
-        {view === "dashboard"    && <Home tx={monthTx} others={monthOthers} house={monthHouse} grocery={monthGrocery} tuition={monthTuition} otherExpense={monthOtherExp} allTx={tx} allOthers={others} allHouse={house} allGrocery={grocery} allTuition={tuition} allOtherExpense={otherExpense} month={month} wallets={wallets} onView={(v) => { if (["personal-dashboard","personal-summary","transactions","paste"].includes(v)) { const tabMap = {"personal-dashboard":"dashboard","personal-summary":"summary","transactions":"transactions","paste":"import"}; setPersonalTab(tabMap[v]||"dashboard"); setView("personal"); } else setView(v); }} displayName={displayName} greeting={getGreeting()} today={today} onMonthChange={setMonth} months={months} />}
+        {view === "dashboard"    && <Home tx={monthTx} others={monthOthers} house={monthHouse} grocery={monthGrocery} tuition={monthTuition} otherExpense={monthOtherExp} allTx={tx} allOthers={others} allHouse={house} allGrocery={grocery} allTuition={tuition} allOtherExpense={otherExpense} sharedTotal={sharedMonthTotal} sharedPrev={sharedPrevTotal} sharedHouseCount={sharedHouseStore.sharedHouses.length} salaries={store.salaries} month={month} wallets={wallets} onView={(v) => { if (["personal-dashboard","personal-summary","transactions","paste"].includes(v)) { const tabMap = {"personal-dashboard":"dashboard","personal-summary":"summary","transactions":"transactions","paste":"import"}; setPersonalTab(tabMap[v]||"dashboard"); setView("personal"); } else setView(v); }} displayName={displayName} greeting={getGreeting()} today={today} onMonthChange={setMonth} months={months} />}
         {view === "budget"       && <Budget wallets={wallets} onAdd={store.addWallet} onUpdate={store.updateWallet} onDelete={store.delWallet} />}
         {view === "loans"        && <Loans loans={store.loans} onAdd={store.addLoan} onUpdate={store.updateLoan} onDelete={store.delLoan} />}
         {view === "debts"        && <Debts debts={store.debts} onAdd={store.addDebt} onUpdate={store.updateDebt} onDelete={store.delDebt} />}
+        {view === "salary"       && <Salary salaries={store.salaries} onAdd={store.addSalary} onUpdate={store.updateSalary} onDelete={store.delSalary} />}
         {view === "year"         && <YearSummary tx={tx} others={others} />}
         {view === "profile"      && <Profile user={user} theme={theme} onThemeChange={setTheme} accent={accent} onAccentChange={setAccent} />}
 

@@ -23,6 +23,13 @@ export function useSharedHouse(uid, userEmail) {
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState(null);
 
+  // Aggregated expenses across ALL shared houses the user belongs to.
+  // Used by the Home dashboard to summarise shared spend for a month.
+  const [allBills,   setAllBills]   = useState([]);
+  const [allGrocery, setAllGrocery] = useState([]);
+  const [allTuition, setAllTuition] = useState([]);
+  const [allOther,   setAllOther]   = useState([]);
+
   // ── Load list of shared houses the user belongs to ────────────────────────
   useEffect(() => {
     if (!isFirebaseConfigured || !uid) return;
@@ -69,6 +76,39 @@ export function useSharedHouse(uid, userEmail) {
     const unsubO = onSnapshot(qOther,   (s) => { setOtherExpense(s.docs.map((d) => ({ id: d.id, ...d.data() }))); });
     return () => { unsubH(); unsubG(); unsubT(); unsubO(); };
   }, [selectedHouseId, sharedHouses]);
+
+  // ── Load expenses across ALL houses the user belongs to (for Home summary) ─
+  useEffect(() => {
+    if (!isFirebaseConfigured || sharedHouses.length === 0) {
+      setAllBills([]); setAllGrocery([]); setAllTuition([]); setAllOther([]);
+      return;
+    }
+    const houseIds = sharedHouses.map((h) => h.id);
+    // Firestore "in" supports up to 30 values — chunk to stay within the limit.
+    const chunks = [];
+    for (let i = 0; i < houseIds.length; i += 30) chunks.push(houseIds.slice(i, i + 30));
+
+    const collections = [
+      { name: "sharedHouseBills",   set: setAllBills   },
+      { name: "sharedHouseGrocery", set: setAllGrocery },
+      { name: "sharedHouseTuition", set: setAllTuition },
+      { name: "sharedHouseOther",   set: setAllOther   },
+    ];
+
+    const unsubs = [];
+    collections.forEach(({ name, set }) => {
+      const parts = new Map(); // chunkIndex -> docs
+      chunks.forEach((ids, ci) => {
+        const qy = query(collection(db, name), where("houseId", "in", ids));
+        const unsub = onSnapshot(qy, (s) => {
+          parts.set(ci, s.docs.map((d) => ({ id: d.id, ...d.data() })));
+          set([...parts.values()].flat());
+        }, (e) => setError(e.message));
+        unsubs.push(unsub);
+      });
+    });
+    return () => unsubs.forEach((u) => u());
+  }, [sharedHouses]);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   const selectedHouse = sharedHouses.find((h) => h.id === selectedHouseId) || null;
@@ -277,6 +317,7 @@ export function useSharedHouse(uid, userEmail) {
     sharedHouses, selectedHouseId, setSelectedHouseId,
     selectedHouse, isOwner,
     house, grocery, tuition, otherExpense, loading, error,
+    allBills, allGrocery, allTuition, allOther,
     createSharedHouse, inviteMember, removeMember, renameSharedHouse, deleteSharedHouse,
     addCategory, removeCategory,
     addBill, updateBill, deleteBill, importBills,

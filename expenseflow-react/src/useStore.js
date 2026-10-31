@@ -28,6 +28,7 @@ const TUITION     = "tuition";
 const OTHER_EXP   = "otherExpense";
 const S_TUITION   = "sharedHouseTuition";
 const S_OTHER_EXP = "sharedHouseOther";
+const SALARIES    = "salaries";
 
 export function useStore(uid, syncTarget = null) {
   // syncTarget: { houseId, ownerUid } — when set, all house/grocery writes mirror to shared collections
@@ -41,6 +42,7 @@ export function useStore(uid, syncTarget = null) {
   const [grocery, setGrocery] = useState([]);
   const [tuition, setTuition] = useState([]);
   const [otherExpense, setOtherExpense] = useState([]);
+  const [salaries, setSalaries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(isFirebaseConfigured ? null : "config");
 
@@ -60,23 +62,27 @@ export function useStore(uid, syncTarget = null) {
     const groceryQuery = query(collection(db, GROCERY),  where("uid", "==", uid));
     const tuitionQuery = query(collection(db, TUITION),  where("uid", "==", uid));
     const otherExpQuery= query(collection(db, OTHER_EXP),where("uid", "==", uid));
+    const salariesQuery= query(collection(db, SALARIES), where("uid", "==", uid));
 
     const unsubTx = onSnapshot(txQuery, (s) => {
       setTx(s.docs.map((d) => ({ id: d.id, ...d.data() })));
       setLoading(false);
     }, (e) => { setError(e.message); setLoading(false); });
 
-    const unsubOthers  = onSnapshot(othersQuery,  (s) => setOthers(s.docs.map((d)  => ({ id: d.id, ...d.data() }))));
-    const unsubWallets = onSnapshot(walletsQuery, (s) => setWallets(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
-    const unsubCats    = onSnapshot(catsQuery,    (s) => setCustomCats(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
-    const unsubLoans   = onSnapshot(loansQuery,   (s) => setLoans(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
-    const unsubDebts   = onSnapshot(debtsQuery,   (s) => setDebts(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
-    const unsubHouse   = onSnapshot(houseQuery,    (s) => setHouse(s.docs.map((d)        => ({ id: d.id, ...d.data() }))));
-    const unsubGrocery = onSnapshot(groceryQuery,  (s) => setGrocery(s.docs.map((d)      => ({ id: d.id, ...d.data() }))));
-    const unsubTuition = onSnapshot(tuitionQuery,  (s) => setTuition(s.docs.map((d)      => ({ id: d.id, ...d.data() }))));
-    const unsubOtherExp= onSnapshot(otherExpQuery, (s) => setOtherExpense(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const onErr = (label) => (e) => setError(`${label}: ${e.message}`);
 
-    return () => { unsubTx(); unsubOthers(); unsubWallets(); unsubCats(); unsubLoans(); unsubDebts(); unsubHouse(); unsubGrocery(); unsubTuition(); unsubOtherExp(); };
+    const unsubOthers  = onSnapshot(othersQuery,  (s) => setOthers(s.docs.map((d)  => ({ id: d.id, ...d.data() }))), onErr("others"));
+    const unsubWallets = onSnapshot(walletsQuery, (s) => setWallets(s.docs.map((d) => ({ id: d.id, ...d.data() }))), onErr("wallets"));
+    const unsubCats    = onSnapshot(catsQuery,    (s) => setCustomCats(s.docs.map((d) => ({ id: d.id, ...d.data() }))), onErr("categories"));
+    const unsubLoans   = onSnapshot(loansQuery,   (s) => setLoans(s.docs.map((d) => ({ id: d.id, ...d.data() }))), onErr("loans"));
+    const unsubDebts   = onSnapshot(debtsQuery,   (s) => setDebts(s.docs.map((d) => ({ id: d.id, ...d.data() }))), onErr("debts"));
+    const unsubHouse   = onSnapshot(houseQuery,    (s) => setHouse(s.docs.map((d)        => ({ id: d.id, ...d.data() }))), onErr("house"));
+    const unsubGrocery = onSnapshot(groceryQuery,  (s) => setGrocery(s.docs.map((d)      => ({ id: d.id, ...d.data() }))), onErr("grocery"));
+    const unsubTuition = onSnapshot(tuitionQuery,  (s) => setTuition(s.docs.map((d)      => ({ id: d.id, ...d.data() }))), onErr("tuition"));
+    const unsubOtherExp= onSnapshot(otherExpQuery, (s) => setOtherExpense(s.docs.map((d) => ({ id: d.id, ...d.data() }))), onErr("otherExpense"));
+    const unsubSalaries= onSnapshot(salariesQuery, (s) => setSalaries(s.docs.map((d) => ({ id: d.id, ...d.data() }))), onErr("salaries"));
+
+    return () => { unsubTx(); unsubOthers(); unsubWallets(); unsubCats(); unsubLoans(); unsubDebts(); unsubHouse(); unsubGrocery(); unsubTuition(); unsubOtherExp(); unsubSalaries(); };
   }, [uid]);
 
   const addTx = useCallback(async ({ date, amount, desc, category }) => {
@@ -271,6 +277,53 @@ export function useStore(uid, syncTarget = null) {
 
   const delDebt = useCallback((id) => deleteDoc(doc(db, DEBTS, id)), []);
 
+  // Salary progression — each entry marks a pay level effective from a date
+  const addSalary = useCallback(async (data) => {
+    await addDoc(collection(db, SALARIES), {
+      amount: Number(data.amount) || 0,
+      allowance: Number(data.allowance) || 0,     // non-base allowance
+      allowanceFreq: data.allowanceFreq || data.frequency || "monthly", // allowance pay rate
+      allowanceLabel: data.allowanceLabel || "",  // e.g. transport, meal, housing
+      allowanceTaxable: data.allowanceTaxable !== false, // allowance subject to tax
+      // Government-mandated deductions (per the chosen frequency)
+      sss: Number(data.sss) || 0,
+      philhealth: Number(data.philhealth) || 0,
+      pagibig: Number(data.pagibig) || 0,
+      tax: Number(data.tax) || 0,                 // withholding tax
+      effectiveDate: data.effectiveDate,          // "YYYY-MM-DD"
+      employer: data.employer || "",
+      title: data.title || "",
+      frequency: data.frequency || "monthly",     // monthly | annual | biweekly | weekly | hourly
+      currency: data.currency || "PHP",
+      changeType: data.changeType || "",          // raise | promotion | new job | adjustment
+      note: data.note || "",
+      uid,
+    });
+  }, [uid]);
+
+  const updateSalary = useCallback(async (id, data) => {
+    await updateDoc(doc(db, SALARIES, id), {
+      amount: Number(data.amount) || 0,
+      allowance: Number(data.allowance) || 0,
+      allowanceFreq: data.allowanceFreq || data.frequency || "monthly",
+      allowanceLabel: data.allowanceLabel || "",
+      allowanceTaxable: data.allowanceTaxable !== false,
+      sss: Number(data.sss) || 0,
+      philhealth: Number(data.philhealth) || 0,
+      pagibig: Number(data.pagibig) || 0,
+      tax: Number(data.tax) || 0,
+      effectiveDate: data.effectiveDate,
+      employer: data.employer || "",
+      title: data.title || "",
+      frequency: data.frequency || "monthly",
+      currency: data.currency || "PHP",
+      changeType: data.changeType || "",
+      note: data.note || "",
+    });
+  }, []);
+
+  const delSalary = useCallback((id) => deleteDoc(doc(db, SALARIES, id)), []);
+
   const delTx    = useCallback((id) => deleteDoc(doc(db, TX, id)),     []);
   const delOther = useCallback((id) => deleteDoc(doc(db, OTHERS, id)), []);
 
@@ -288,5 +341,5 @@ export function useStore(uid, syncTarget = null) {
     return docs.length;
   }, [uid]);
 
-  return { tx, others, house, grocery, tuition, otherExpense, wallets, customCats, loans, debts, loading, error, addTx, importMany, addOther, delTx, delOther, deleteMonth, addWallet, updateWallet, delWallet, addCategory, delCategory, addLoan, updateLoan, delLoan, addDebt, updateDebt, delDebt, addHouse, updateHouse, delHouse, importManyHouse, addGrocery, delGrocery, importManyGrocery, addTuition, delTuition, addOtherExpense, delOtherExpense };
+  return { tx, others, house, grocery, tuition, otherExpense, salaries, wallets, customCats, loans, debts, loading, error, addTx, importMany, addOther, delTx, delOther, deleteMonth, addWallet, updateWallet, delWallet, addCategory, delCategory, addLoan, updateLoan, delLoan, addDebt, updateDebt, delDebt, addSalary, updateSalary, delSalary, addHouse, updateHouse, delHouse, importManyHouse, addGrocery, delGrocery, importManyGrocery, addTuition, delTuition, addOtherExpense, delOtherExpense };
 }

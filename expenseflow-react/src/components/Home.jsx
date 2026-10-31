@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { money, monthLabel } from "../helpers";
-import { IconChevronRight, IconBudget, IconHouse, IconTransactions, IconTravel, IconLoan, IconDebt } from "./Icons";
+import { money, monthLabel, salaryProgression } from "../helpers";
+import { IconChevronRight, IconBudget, IconHouse, IconTransactions, IconTravel, IconLoan, IconDebt, IconSalary } from "./Icons";
 import MonthPicker from "./MonthPicker";
 
 function trend(current, prev) {
@@ -84,8 +84,16 @@ function NavTile({ icon, title, sub, onClick }) {
 export default function Home({
   tx, others,
   allTx, allOthers,
+  sharedTotal = 0, sharedPrev = 0, sharedHouseCount = 0,
+  salaries = [],
   month, wallets, onView, displayName, greeting, today, onMonthChange, months,
 }) {
+  const salaryInfo = useMemo(() => {
+    const prog = salaryProgression(salaries);
+    if (prog.length === 0) return null;
+    const latest = prog[0];
+    return { latest, monthly: latest.monthlyEquivalent, base: latest.monthlyBase, allowance: latest.monthlyAllowance, net: latest.monthlyNet, hasDeductions: latest.monthlyDeductions > 0, growthPct: latest.growthPct, count: prog.length };
+  }, [salaries]);
   const personalTotal = useMemo(() =>
     tx.reduce((s, x) => s + x.amount, 0) + others.reduce((s, x) => s + x.amount, 0),
   [tx, others]);
@@ -134,8 +142,11 @@ export default function Home({
         />
         <SpendCard
           label="Shared expenses"
-          amount={0}
-          sub="Bills split across housemates"
+          amount={sharedTotal}
+          prev={sharedPrev}
+          sub={sharedHouseCount > 0
+            ? `Across ${sharedHouseCount} shared house${sharedHouseCount !== 1 ? "s" : ""} · ${monthLabel(month, { month: "long" })}`
+            : "Bills split across housemates"}
           onClick={() => onView("shared-house")}
         />
       </div>
@@ -144,16 +155,28 @@ export default function Home({
       <div className="two">
 
         {/* Top spends */}
-        {topPersonalCat && (
+        {(topPersonalCat || salaryInfo) && (
           <div className="card">
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>This month's highlights</div>
             <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 12 }}>{monthLabel(month, { month: "long", year: "numeric" })}</div>
-            <HighlightRow
-              icon={<svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="6" r="3"/><path d="M3 16c0-3 2.7-5 6-5s6 2 6 5"/></svg>}
-              label="Top personal category"
-              name={topPersonalCat.name}
-              amount={topPersonalCat.amount}
-            />
+            {topPersonalCat && (
+              <HighlightRow
+                icon={<svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="6" r="3"/><path d="M3 16c0-3 2.7-5 6-5s6 2 6 5"/></svg>}
+                label="Top personal category"
+                name={topPersonalCat.name}
+                amount={topPersonalCat.amount}
+              />
+            )}
+            {salaryInfo && (
+              <HighlightRow
+                icon={<IconSalary size={16} />}
+                label={salaryInfo.hasDeductions ? "Net take-home (monthly)" : "Current basic salary (monthly)"}
+                name={salaryInfo.latest.allowance > 0
+                  ? `Basic ${money(salaryInfo.base)} + allowance ${money(salaryInfo.allowance)}`
+                  : (salaryInfo.latest.changeType || salaryInfo.latest.title || "Latest")}
+                amount={salaryInfo.hasDeductions ? salaryInfo.net : salaryInfo.base}
+              />
+            )}
           </div>
         )}
 
@@ -193,6 +216,7 @@ export default function Home({
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
           <NavTile icon={<IconBudget size={16}/>}      title="Budget"       sub="Accounts & balances"       onClick={() => onView("budget")} />
           <NavTile icon={<IconDebt size={16}/>}        title="Owed to Me"   sub="Track debts & repayments"  onClick={() => onView("debts")} />
+          <NavTile icon={<IconSalary size={16}/>}      title="Salary"       sub="Income progression"        onClick={() => onView("salary")} />
           <NavTile icon={<IconLoan size={16}/>}        title="Loans"        sub="Installments & payoff"     onClick={() => onView("loans")} />
           <NavTile icon={<IconTransactions size={16}/>} title="Personal"    sub="Dashboard & transactions"  onClick={() => onView("personal")} />
           <NavTile icon={<IconHouse size={16}/>}       title="Shared House" sub="Split bills & expenses"    onClick={() => onView("shared-house")} />

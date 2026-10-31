@@ -144,3 +144,61 @@ export function mergedCategories(customCats = []) {
   }
   return [...seen.values()].sort((a, b) => a.localeCompare(b));
 }
+
+// Normalize a salary amount + frequency into an approximate monthly figure,
+// so different pay cadences can be compared on the dashboard.
+export function monthlySalary(amount, frequency = "monthly") {
+  const n = Number(amount) || 0;
+  switch (frequency) {
+    case "annual":   return n / 12;
+    case "biweekly": return (n * 26) / 12;
+    case "weekly":   return (n * 52) / 12;
+    case "hourly":   return n * 160; // ~40h/week
+    case "monthly":
+    default:         return n;
+  }
+}
+
+// Given salary entries, return them sorted by effective date descending plus
+// per-entry growth vs. the previous (older) salary, as monthly-equivalent.
+// Growth is compared on total monthly pay (base + allowance).
+export function salaryProgression(salaries = []) {
+  const sorted = salaries
+    .slice()
+    .sort((a, b) => (a.effectiveDate || "").localeCompare(b.effectiveDate || ""));
+  const grossOf = (s) => monthlySalary(s.amount, s.frequency) + monthlySalary(s.allowance, s.allowanceFreq || s.frequency);
+  const withGrowth = sorted.map((s, i) => {
+    const prev = sorted[i - 1];
+    const base      = monthlySalary(s.amount, s.frequency);
+    const allowance = monthlySalary(s.allowance, s.allowanceFreq || s.frequency);
+    const gross     = base + allowance;
+    // Mandatory deductions normalized to monthly
+    const sss        = monthlySalary(s.sss, s.frequency);
+    const philhealth = monthlySalary(s.philhealth, s.frequency);
+    const pagibig    = monthlySalary(s.pagibig, s.frequency);
+    const tax        = monthlySalary(s.tax, s.frequency);
+    const deductions = sss + philhealth + pagibig + tax;
+    const net        = gross - deductions;
+
+    const old  = prev ? grossOf(prev) : null;
+    const pct  = old && old > 0 ? ((gross - old) / old) * 100 : null;
+    const diff = old != null ? gross - old : null;
+    return {
+      ...s,
+      monthlyBase: base,
+      monthlyAllowance: allowance,
+      monthlyGross: gross,
+      monthlyEquivalent: gross, // gross total: base + allowance
+      monthlySSS: sss,
+      monthlyPhilhealth: philhealth,
+      monthlyPagibig: pagibig,
+      monthlyTax: tax,
+      monthlyDeductions: deductions,
+      monthlyNet: net,
+      growthPct: pct,
+      growthAmount: diff,
+    };
+  });
+  // Newest first for display
+  return withGrowth.reverse();
+}
