@@ -112,6 +112,13 @@ service cloud.firestore {
       allow update: if ownsExisting('uid') && ownerUnchanged('uid') && validAmount();
     }
 
+    // Salary progression history (scoped by `uid`).
+    match /salaries/{id} {
+      allow read, delete: if ownsExisting('uid');
+      allow create: if isOwnerField('uid') && validAmount();
+      allow update: if ownsExisting('uid') && ownerUnchanged('uid') && validAmount();
+    }
+
     // ── userLookup: a user may only write their own {uid} doc ───────────
     // Readable by any signed-in user so invite-by-email can resolve a uid.
     match /userLookup/{uid} {

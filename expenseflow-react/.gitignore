@@ -4,3 +4,9 @@ dist
 .env.local
 *.log
 .DS_Store
+
+# Capacitor / iOS native build artifacts
+ios/App/Pods
+ios/App/App/public
+DerivedData
+*.xcuserstate

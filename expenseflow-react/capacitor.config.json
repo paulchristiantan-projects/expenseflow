@@ -1,0 +1,9 @@
+{
+  "appId": "com.expenseflow.app",
+  "appName": "ExpenseFlow",
+  "webDir": "dist",
+  "backgroundColor": "#4a5adf",
+  "ios": {
+    "contentInset": "always"
+  }
+}
