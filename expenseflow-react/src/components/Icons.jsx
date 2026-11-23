@@ -180,6 +180,17 @@ export function IconTravel({ size = 18 }) {
   );
 }
 
+export function IconCreditCard({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1.5" y="4" width="15" height="10" rx="2" />
+      <path d="M1.5 7.5h15" />
+      <rect x="3.5" y="10" width="4" height="1.5" rx=".5" fill="currentColor" stroke="none" />
+      <rect x="9" y="10" width="2" height="1.5" rx=".5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function IconSalary({ size = 18 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { CATEGORIES, defaultDateForMonth, money } from "../helpers";
+import { createPortal } from "react-dom";
 import { IconClose } from "./Icons";
 import CategorySelect from "./CategorySelect";
 
@@ -57,7 +58,7 @@ export default function AddModal({ open, month, onClose, onSave, categories = CA
     }
   }
 
-  return (
+  return createPortal(
     <div
       className={"modal" + (open ? " open" : "")}
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
@@ -130,6 +131,7 @@ export default function AddModal({ open, month, onClose, onSave, categories = CA
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

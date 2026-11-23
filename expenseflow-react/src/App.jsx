@@ -3,6 +3,7 @@ import { useStore } from "./useStore";
 import { useAuth } from "./useAuth";
 import { useSharedHouse, registerUserLookup } from "./useSharedHouse";
 import { useTravel, resolveTravelInvites } from "./useTravel";
+import { useCreditCards } from "./useCreditCards";
 import { monthLabel, mergedCategories } from "./helpers";
 import Home          from "./components/Home";
 import Dashboard    from "./components/Dashboard";
@@ -22,11 +23,12 @@ import Profile      from "./components/Profile";
 import HouseExpenses, { HouseBulkImport, HouseMonthlySummary } from "./components/HouseExpenses";
 import HouseDashboard from "./components/HouseDashboard";import SharedHouse  from "./components/SharedHouse";
 import Travel        from "./components/Travel";
+import CreditCards  from "./components/CreditCards";
 import { applyAccent, DEFAULT_ACCENT } from "./accents";
 import MonthPicker from "./components/MonthPicker";
 import {
   IconHome, IconTransactions, IconYear,
-  IconImport, IconProfile, IconLogout, IconLeaf, IconPlus, IconBudget, IconHouse, IconTravel, IconLoan, IconDebt, IconSalary,
+  IconImport, IconProfile, IconLogout, IconLeaf, IconPlus, IconBudget, IconHouse, IconTravel, IconLoan, IconDebt, IconSalary, IconCreditCard,
 } from "./components/Icons";
 
 function getGreeting() {
@@ -42,6 +44,7 @@ export default function App() {
   const { user, authLoading, logout } = auth;
   const sharedHouseStore = useSharedHouse(user?.uid, user?.email);
   const travelStore      = useTravel(user?.uid, user?.email);
+  const creditCardStore  = useCreditCards(user?.uid);
 
   // Register user lookup so invites-by-email resolve on next login
   useEffect(() => {
@@ -62,12 +65,15 @@ export default function App() {
   const { tx, others, house, grocery, tuition, otherExpense, wallets, customCats, loading, error } = store;
   const categoryList = useMemo(() => mergedCategories(customCats), [customCats]);
 
-  const VALID_VIEWS = ["dashboard", "budget", "loans", "debts", "salary", "personal", "shared-house", "travel", "profile", "year"];
+  const VALID_VIEWS = ["dashboard", "budget", "creditcards", "loans", "debts", "salary", "personal", "shared-house", "travel", "profile", "year"];
   const [view,      setView]      = useState(() => {
     const saved = localStorage.getItem("view");
     return VALID_VIEWS.includes(saved) ? saved : "dashboard";
   });
-  const [month,     setMonth]     = useState("2026-08");
+  const [month,     setMonth]     = useState(() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`;
+  });
   const [modalOpen, setModalOpen] = useState(false);
   const [otherOpen, setOtherOpen] = useState(false);
   const [confirmMonth, setConfirmMonth] = useState(false);
@@ -178,7 +184,7 @@ export default function App() {
   const displayName = user.displayName || user.email?.split("@")[0] || "there";
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   const hideTopBar = view === "profile" || view === "budget" || view === "dashboard"
-    || view === "personal" || view === "shared-house" || view === "travel" || view === "loans" || view === "debts" || view === "salary";
+    || view === "personal" || view === "shared-house" || view === "travel" || view === "loans" || view === "debts" || view === "salary" || view === "creditcards";
 
   const personalViews = ["personal"];
 
@@ -197,6 +203,14 @@ export default function App() {
         </button>
         <button className={view === "budget" ? "active" : ""} onClick={() => navTo("budget")}>
           <span className="nav-icon"><IconBudget /></span><span>Budget</span>
+        </button>
+        <button className={view === "creditcards" ? "active" : ""} onClick={() => navTo("creditcards")}>
+          <span className="nav-icon"><IconCreditCard /></span><span>Credit Cards</span>
+          {creditCardStore.cards?.length > 0 && (
+            <span style={{ marginLeft: "auto", background: "var(--accent)", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px", fontWeight: 700 }}>
+              {creditCardStore.cards.length}
+            </span>
+          )}
         </button>
         <button className={view === "loans" ? "active" : ""} onClick={() => navTo("loans")}>
           <span className="nav-icon"><IconLoan /></span>
@@ -316,6 +330,22 @@ export default function App() {
         {view === "loans"        && <Loans loans={store.loans} onAdd={store.addLoan} onUpdate={store.updateLoan} onDelete={store.delLoan} />}
         {view === "debts"        && <Debts debts={store.debts} onAdd={store.addDebt} onUpdate={store.updateDebt} onDelete={store.delDebt} />}
         {view === "salary"       && <Salary salaries={store.salaries} onAdd={store.addSalary} onUpdate={store.updateSalary} onDelete={store.delSalary} />}
+        {view === "creditcards"  && (
+          <CreditCards
+            cards={creditCardStore.cards}
+            payments={creditCardStore.payments}
+            rewards={creditCardStore.rewards}
+            onAddCard={creditCardStore.addCard}
+            onUpdateCard={creditCardStore.updateCard}
+            onDeleteCard={creditCardStore.deleteCard}
+            onAddPayment={creditCardStore.addPayment}
+            onUpdatePayment={creditCardStore.updatePayment}
+            onDeletePayment={creditCardStore.deletePayment}
+            onAddReward={creditCardStore.addReward}
+            onUpdateReward={creditCardStore.updateReward}
+            onDeleteReward={creditCardStore.deleteReward}
+          />
+        )}
         {view === "year"         && <YearSummary tx={tx} others={others} />}
         {view === "profile"      && <Profile user={user} theme={theme} onThemeChange={setTheme} accent={accent} onAccentChange={setAccent} />}
 

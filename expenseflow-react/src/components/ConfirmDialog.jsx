@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { IconClose } from "./Icons";
 
 // Controlled confirm dialog.
@@ -19,7 +20,7 @@ export default function ConfirmDialog({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div className="modal open" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel?.(); }}>
       <div className="modalbox" style={{ width: "min(400px, 100%)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
@@ -55,6 +56,7 @@ export default function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

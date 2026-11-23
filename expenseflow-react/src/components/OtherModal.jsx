@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { CATEGORIES } from "../helpers";
+import { createPortal } from "react-dom";
 import { IconClose } from "./Icons";
 import CategorySelect from "./CategorySelect";
 
@@ -42,7 +43,7 @@ export default function OtherModal({ open, onClose, onSave, categories = CATEGOR
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div className="modal open" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modalbox" style={{ width: "min(440px, 100%)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
@@ -78,6 +79,7 @@ export default function OtherModal({ open, onClose, onSave, categories = CATEGOR
           <button className="btn primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

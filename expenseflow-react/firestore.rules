@@ -6,6 +6,9 @@ rules_version = '2';
 //  - Personal collections carry a `uid` field = the owner's auth uid.
 //  - Shared collections (sharedHouse*, trip*) carry an `ownerUid` plus a
 //    `memberUids` array on the parent doc (sharedHouses / trips).
+//  - Credit card collections (creditCards, creditCardPayments,
+//    creditCardRewards) carry a `uid` field like other personal collections.
+//    Payments and rewards also carry a `cardId` linking them to their card.
 //  - `userLookup/{uid}` maps a uid -> email so invites-by-email can resolve.
 //
 // Principles enforced below:
@@ -35,6 +38,14 @@ service cloud.firestore {
       return request.resource.data.amount is number
         && request.resource.data.amount >= -100000000
         && request.resource.data.amount <= 100000000;
+    }
+
+    // Value sanity (used for credit card rewards — field name is `value`, not `amount`).
+    // Rewards can legitimately be 0 (e.g. NAFFL, free-item perks).
+    function validValue() {
+      return request.resource.data.value is number
+        && request.resource.data.value >= 0
+        && request.resource.data.value <= 100000000;
     }
 
     // Ownership must never change on update.
@@ -117,6 +128,39 @@ service cloud.firestore {
       allow read, delete: if ownsExisting('uid');
       allow create: if isOwnerField('uid') && validAmount();
       allow update: if ownsExisting('uid') && ownerUnchanged('uid') && validAmount();
+    }
+
+    // ── Credit cards (scoped by `uid`) ───────────────────────────────────
+    // creditCards holds card metadata (name, limit, expiry, soaDate, etc.).
+    // creditCardPayments holds SOA payment history linked by cardId.
+    // creditCardRewards holds rewards/perks earned, linked by cardId.
+
+    match /creditCards/{id} {
+      allow read, delete: if ownsExisting('uid');
+      allow create: if isOwnerField('uid');
+      allow update: if ownsExisting('uid') && ownerUnchanged('uid');
+    }
+
+    match /creditCardPayments/{id} {
+      allow read, delete: if ownsExisting('uid');
+      allow create: if isOwnerField('uid')
+                    && validAmount()
+                    && request.resource.data.cardId is string
+                    && request.resource.data.cardId.size() > 0;
+      allow update: if ownsExisting('uid')
+                    && ownerUnchanged('uid')
+                    && validAmount();
+    }
+
+    match /creditCardRewards/{id} {
+      allow read, delete: if ownsExisting('uid');
+      allow create: if isOwnerField('uid')
+                    && validValue()
+                    && request.resource.data.cardId is string
+                    && request.resource.data.cardId.size() > 0;
+      allow update: if ownsExisting('uid')
+                    && ownerUnchanged('uid')
+                    && validValue();
     }
 
     // ── userLookup: a user may only write their own {uid} doc ───────────
