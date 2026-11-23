@@ -1,9 +1,23 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { money } from "../helpers";
 import { IconPlus, IconEdit, IconTrash, IconClose } from "./Icons";
 
-const WALLET_COLORS = [
-  { label: "Green",  value: "#2d6a2d" },
+/** Convert a Unix ms timestamp to a human-readable relative string */
+function timeAgo(ts) {
+  if (!ts) return null;
+  const diff  = Date.now() - ts;
+  const mins  = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days  = Math.floor(diff / 86400000);
+  if (mins  < 1)  return "just now";
+  if (mins  < 60) return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days  < 7)  return `${days}d ago`;
+  return new Date(ts).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+}
+
+const WALLET_COLORS = [  { label: "Green",  value: "#2d6a2d" },
   { label: "Blue",   value: "#1a5fa8" },
   { label: "Purple", value: "#6b3fa0" },
   { label: "Orange", value: "#c05c1a" },
@@ -57,7 +71,7 @@ function WalletModal({ initial, onSave, onClose }) {
     onSave({ name: name.trim(), balance: Number(balance), color, icon });
   }
 
-  return (
+  return createPortal(
     <div className="modal open">
       <div className="modalbox" style={{ width: "min(440px,100%)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
@@ -137,7 +151,8 @@ function WalletModal({ initial, onSave, onClose }) {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -232,6 +247,11 @@ export default function Budget({ wallets, onAdd, onUpdate, onDelete }) {
               <div className="wallet-card-pct">
                 {total > 0 ? Math.round((w.balance / total) * 100) : 0}% of total
               </div>
+              {w.updatedAt && (
+                <div style={{ fontSize: 10, opacity: .55, marginTop: 4, letterSpacing: ".02em" }}>
+                  Updated {timeAgo(w.updatedAt)}
+                </div>
+              )}
             </div>
           ))}
         </div>

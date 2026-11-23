@@ -205,11 +205,11 @@ export function useStore(uid, syncTarget = null) {
 
   // Wallet CRUD
   const addWallet = useCallback(async ({ name, balance, color, icon }) => {
-    await addDoc(collection(db, WALLETS), { name, balance: Number(balance), color, icon, uid });
+    await addDoc(collection(db, WALLETS), { name, balance: Number(balance), color, icon, uid, createdAt: Date.now(), updatedAt: Date.now() });
   }, [uid]);
 
   const updateWallet = useCallback(async (id, fields) => {
-    await updateDoc(doc(db, WALLETS, id), { ...fields, balance: Number(fields.balance) });
+    await updateDoc(doc(db, WALLETS, id), { ...fields, balance: Number(fields.balance), updatedAt: Date.now() });
   }, []);
 
   const delWallet = useCallback((id) => deleteDoc(doc(db, WALLETS, id)), []);
