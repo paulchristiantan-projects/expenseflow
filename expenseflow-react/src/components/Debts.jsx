@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { money, getInitials, todayISO } from "../helpers";
 import { IconPlus, IconEdit, IconTrash, IconClose, IconDebt } from "./Icons";
 import ConfirmDialog from "./ConfirmDialog";
@@ -36,7 +37,7 @@ function DebtModal({ initial, onSave, onClose }) {
     }
   }
 
-  return (
+  return createPortal(
     <div className="modal open" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modalbox" style={{ width: "min(460px, 100%)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
@@ -79,10 +80,10 @@ function DebtModal({ initial, onSave, onClose }) {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
-
 function DebtCard({ debt, onEdit, onDelete, onRecordPayment }) {
   const remaining = Math.max(0, (debt.amount || 0) - (debt.paidAmount || 0));
   const pct = debt.amount > 0 ? Math.round(((debt.paidAmount || 0) / debt.amount) * 100) : 0;
@@ -207,7 +208,7 @@ export default function Debts({ debts, onAdd, onUpdate, onDelete }) {
       </div>
 
       {debts.length > 0 && (
-        <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: 18 }}>
+        <div className="grid-3" style={{ marginBottom: 18 }}>
           <div className="card kpi kpi-accent">
             <div className="label">Total outstanding</div>
             <div className="value">{money(totals.outstanding)}</div>
@@ -235,7 +236,7 @@ export default function Debts({ debts, onAdd, onUpdate, onDelete }) {
           </div>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 15 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(300px,100%), 1fr))", gap: 15 }}>
           {sorted.map((d) => (
             <DebtCard key={d.id} debt={d} onEdit={openEdit} onDelete={setPendingDelete} onRecordPayment={openPayment} />
           ))}
@@ -247,7 +248,7 @@ export default function Debts({ debts, onAdd, onUpdate, onDelete }) {
       )}
 
       {/* Record payment mini-modal */}
-      {payFor && (
+      {payFor && createPortal(
         <div className="modal open" onMouseDown={(e) => { if (e.target === e.currentTarget) setPayFor(null); }}>
           <div className="modalbox" style={{ width: "min(380px, 100%)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -269,7 +270,8 @@ export default function Debts({ debts, onAdd, onUpdate, onDelete }) {
               <button className="btn primary" onClick={confirmPayment}>Record</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <ConfirmDialog

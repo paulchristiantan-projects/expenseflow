@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { money, monthLabel, loanProgress, defaultDateForMonth } from "../helpers";
 import { IconPlus, IconEdit, IconTrash, IconClose, IconLoan } from "./Icons";
 import ConfirmDialog from "./ConfirmDialog";
@@ -40,7 +41,7 @@ function LoanModal({ initial, onSave, onClose }) {
     }
   }
 
-  return (
+  return createPortal(
     <div className="modal open" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modalbox" style={{ width: "min(460px, 100%)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
@@ -87,7 +88,8 @@ function LoanModal({ initial, onSave, onClose }) {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -199,7 +201,7 @@ export default function Loans({ loans, onAdd, onUpdate, onDelete }) {
 
       {/* Summary */}
       {loans.length > 0 && (
-        <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: 18 }}>
+        <div className="grid-3" style={{ marginBottom: 18 }}>
           <div className="card kpi kpi-accent">
             <div className="label">Total remaining</div>
             <div className="value">{money(totals.remaining)}</div>
@@ -227,7 +229,7 @@ export default function Loans({ loans, onAdd, onUpdate, onDelete }) {
           </div>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 15 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(300px,100%), 1fr))", gap: 15 }}>
           {sorted.map((l) => (
             <LoanCard key={l.id} loan={l} refMonth={refMonth} onEdit={openEdit} onDelete={setPendingDelete} />
           ))}

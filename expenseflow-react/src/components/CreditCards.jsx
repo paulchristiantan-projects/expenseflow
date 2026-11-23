@@ -719,27 +719,27 @@ export default function CreditCards({
                   {pmtYear === "All" && yearBreakdown.length > 0 && (
                     <div className="card" style={{ marginBottom: 14, padding: "14px 16px" }}>
                       <div className="month-breakdown-list">
+                        {/* Header */}
                         <div style={{
-                          display: "grid", gridTemplateColumns: "1fr auto auto", gap: 8,
-                          padding: "4px 4px 10px", borderBottom: "1px solid var(--line)",
-                          fontSize: 11, color: "var(--muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em",
+                          display: "grid", gridTemplateColumns: "60px 1fr auto 150px",
+                          gap: 8, padding: "4px 4px 10px", borderBottom: "1.5px solid var(--accent-soft)",
+                          fontSize: 11, color: "var(--muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em",
                         }}>
-                          <span>Year</span>
-                          <span style={{ textAlign: "right" }}>Payments</span>
-                          <span style={{ textAlign: "right", minWidth: 110 }}>Total</span>
+                          <span>Year</span><span /><span style={{ textAlign: "right" }}>Payments</span>
+                          <span style={{ textAlign: "right" }}>Total</span>
                         </div>
                         {yearBreakdown.map(y => (
-                          <div key={y.year} className="month-breakdown-row" style={{ cursor: "pointer" }}
-                            onClick={() => setPmtYear(y.year)}
-                            onMouseEnter={e => e.currentTarget.style.background = "var(--accent-bg)"}
-                            onMouseLeave={e => e.currentTarget.style.background = ""}>
+                          <div key={y.year} className="cc-yr-row"
+                            onClick={() => setPmtYear(y.year)}>
                             <span className="mbl-month" style={{ fontWeight: 600 }}>{y.year}</span>
+                            <span />
                             <span className="mbl-count">{y.count}</span>
                             <span className="mbl-total">{fmt(y.total)}</span>
                           </div>
                         ))}
-                        <div className="month-breakdown-row total-row">
+                        <div className="cc-yr-row total-row">
                           <span className="mbl-month">Total</span>
+                          <span />
                           <span className="mbl-count">{cardPayments.length}</span>
                           <span className="mbl-total" style={{ color: "var(--text)" }}>
                             {fmt(cardPayments.reduce((s, p) => s + p.amount, 0))}
@@ -774,13 +774,15 @@ export default function CreditCards({
                   ) : (
                     <div className="card cc-entries-wrap">
                       <div className="cc-entry-head">
-                        <span>Date</span><span>Amount</span><span>Note</span><span />
+                        <span>Date</span><span>Amount</span><span>Note</span>
+                        <span className="cc-entry-spacer" /><span />
                       </div>
                       {filteredPayments.map(p => (
                         <div key={p.id} className="cc-entry-row">
                           <div className="cc-entry-date">{fmtDate(p.date)}</div>
                           <div className="cc-entry-amt">{fmt(p.amount)}</div>
                           <div className="cc-entry-note">{p.note || "—"}</div>
+                          <div className="cc-entry-spacer" />
                           <div className="cc-entry-acts">
                             <button className="tx-delete-btn" title="Edit"
                               onClick={() => { setEditPmt(p); setPmtModal(true); }}>
